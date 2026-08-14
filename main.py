@@ -36,7 +36,7 @@ registros_nominalizacion = nominalizacion.get_all_values()
 registros_usuarios = usuarios.get_all_values()
 
 while True:
-    print("TABLA OFICINA EMPLEO")
+
 
     for dato in registros_oficina_empleo:
         if dato[2] == dni_buscar:
@@ -48,7 +48,7 @@ while True:
         print(f"Se encontro al beneficiario {contador} veces")
     
 
-    print("TABLA DESARROLLO AGRARIO")
+
     contador = 0
 
     for dato in registros_desarrollo_agrario:
@@ -60,7 +60,7 @@ while True:
     if contador > 1:
         print(f"Se encontro al beneficiario {contador} veces")
 
-    print("TABLA RECEPCION")
+
     contador = 0
 
     for dato in registros_registro_recepcion:
@@ -72,7 +72,7 @@ while True:
     if contador > 1:
         print(f"Se encontro al beneficiario {contador} veces")
 
-    print("TABLA INSCRIPCION CUATRIMESTRAL")
+
     contador = 0
 
     for dato in registros_inscripcion_cuatrimestral:
@@ -84,7 +84,7 @@ while True:
     if contador > 1:
         print(f"Se encontro al beneficiario {contador} veces")
 
-    print("TABLA FORMULARIO INSCRIPCION")
+
     contador = 0
 
     for dato in registros_formulario_inscripcion:
@@ -107,7 +107,7 @@ while True:
     if contador > 1:
         print(f"Se encontro al beneficiario {contador} veces")
 
-    print("TABLA NOMINALIZACION")
+
     contador = 0
 
     for dato in registros_nominalizacion:
@@ -130,7 +130,7 @@ while True:
     if contador > 1:
         print(f"Se encontro al beneficiario {contador} veces")
 
-    print("TABLA USUARIOS")
+
     contador = 0
 
     for dato in registros_usuarios:
