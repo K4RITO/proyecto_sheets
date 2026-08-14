@@ -1,5 +1,6 @@
 import gspread
 
+
 dni_buscar = input("Ingrese DNI de la persona que quiere buscar: ")
 
 while not dni_buscar.isdigit():
