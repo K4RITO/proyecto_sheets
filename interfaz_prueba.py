@@ -20,7 +20,7 @@ import gspread
 # Configuracion de conexion
 # ------------------------------------------------------------------
 CREDENTIALS_FILE = "proyecto-sheets-505320-bb8ae069f096.json"
-SHEET_NAME = "Tablas IMDEL Prototipo"
+SHEET_NAME = "Tablas IMDEL Prototipo 2"
 
 
 # ------------------------------------------------------------------
@@ -59,87 +59,114 @@ def _limpiar_solo_digitos(valor, min_len):
 # ------------------------------------------------------------------
 SHEETS_CONFIG = [
     {
-        "nombre_interno": "oficina_empleo",
+        "nombre_interno": "INSCRIPCIÓN CUATRIMESTRAL CAPACITACION EN OFICIOS",
         "worksheet_index": 0,
-        "col_dni": 2,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[1]}\nPrograma: Oficina empleo"
-        ),
-    },
-    {
-        "nombre_interno": "desarrollo_agrario",
-        "worksheet_index": 1,
-        "col_dni": 2,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[1]} {dato[0]}\n"
-            f"Coordinacion: Desarrollo agrario\n"
-            f"Programa: Huertas familiares"
-        ),
-    },
-    {
-        "nombre_interno": "registro_recepcion",
-        "worksheet_index": 2,
-        "col_dni": 6,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[3]} {dato[2]}\n"
-            f"Coordinacion: Capacitacion laboral y empleo\n"
-            f"Programa: Fortalecimiento de Trayectorias Laborales"
-        ),
-    },
-    {
-        "nombre_interno": "inscripcion_cuatrimestral",
-        "worksheet_index": 3,
-        "col_dni": 5,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[3]} {dato[2]}\n"
-            f"Coordinacion: Capacitacion laboral y empleo\n"
-            f"Programa: Capacitacion laboral"
-        ),
-    },
-    {
-        "nombre_interno": "formulario_inscripcion",
-        "worksheet_index": 4,
-        "col_dni": 39,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[37]} {dato[38]}\n"
-            f"Coordinacion: Capacitacion laboral y empleo\n"
-            f"Programa: Insercion laboral"
-        ),
-    },
-    {
-        "nombre_interno": "nominalizacion",
-        "worksheet_index": 5,
-        "col_dni": 9,
-        "limpiar": _limpiar_recorte,
-        "min_len": 9,
-        "formatear": lambda dato: (
-            f"Apellido y nombre: {dato[7]} {dato[8]}\n"
-            f"Coordinacion: Capacitacion laboral y empleo\n"
-            f"Programa: Plan fines"
-        ),
-    },
-    {
-        "nombre_interno": "usuarios",
-        "worksheet_index": 6,
-        "col_dni": 5,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[2]} {dato[1]}\n"
-            f"Coordinacion: Economia popular\n"
-            f"Programa: Registro de Trabajadores de la Economia Popular"
+            f"Coordinacion: Capacitación laboral y empleo\n"
+            f"Programa: Capacitación laboral\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
         ),
     },
+    {
+        "nombre_interno": "OFICINA EMPLEO",
+        "worksheet_index": 1,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
+        "limpiar": _limpiar_recorte,
+        "min_len": 9,
+        "formatear": lambda dato: (
+            f"Apellido y nombre: {dato[1]} {dato[2]}\n"
+            f"Coordinacion: Capacitación laboral y empleo\n"
+            "Programa: Inserción laboral\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
+        ),
+    },
+    {
+        "nombre_interno": "NOMINALIZACIÓN",
+        "worksheet_index": 2,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
+        "limpiar": _limpiar_recorte,
+        "min_len": 9,
+        "formatear": lambda dato: (
+            f"Apellido y nombre: {dato[2]} {dato[1]}\n"
+            f"Coordinacion: Capacitacón laboral y empleo\n"
+            f"Programa: Plan FINES\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
+        ),
+    },
+    {
+        "nombre_interno": "DESARROLLO AGRARIO",
+        "worksheet_index": 3,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
+        "limpiar": _limpiar_recorte,
+        "min_len": 9,
+        "formatear": lambda dato: (
+            f"Apellido y nombre: {dato[2]} {dato[1]}\n"
+            f"Coordinacion: Desarrollo agrario\n"
+            f"Programa: Huertas familiares - Entregas KIT de semillas\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
+        ),
+    },
+    {
+        "nombre_interno": "PRODUCTORES",
+        "worksheet_index": 4,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
+        "limpiar": _limpiar_recorte,
+        "min_len": 9,
+        "formatear": lambda dato: (
+            f"Apellido y nombre: {dato[1]} {dato[2]}\n"
+            f"Coordinacion: Desarrollo agrario\n"
+            f"Programa: RETEP - Registro de trabajadores de la economía popular\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
+        ),
+    },
+    # {
+    #     "nombre_interno": "nominalizacion",
+    #     "worksheet_index": 5,
+    #     "col_dni": 9,
+    #     "limpiar": _limpiar_recorte,
+    #     "min_len": 9,
+    #     "formatear": lambda dato: (
+    #         f"Apellido y nombre: {dato[7]} {dato[8]}\n"
+    #         f"Coordinacion: Capacitacion laboral y empleo\n"
+    #         f"Programa: Plan fines"
+    #     ),
+    # },
+    # {
+    #     "nombre_interno": "usuarios",
+    #     "worksheet_index": 6,
+    #     "col_dni": 5,
+    #     "limpiar": _limpiar_recorte,
+    #     "min_len": 9,
+    #     "formatear": lambda dato: (
+    #         f"Apellido y nombre: {dato[2]} {dato[1]}\n"
+    #         f"Coordinacion: Economia popular\n"
+    #         f"Programa: Registro de Trabajadores de la Economia Popular"
+    #     ),
+    # },
 ]
 
 
@@ -288,13 +315,14 @@ class BuscadorApp:
 
         self._escribir_resultado("", limpiar=True)
         encontrado = False
+        domicilio = ""
 
         for hoja in SHEETS_CONFIG:
             col_dni = hoja["col_dni"]
             nombre_interno = hoja["nombre_interno"]
+            col_domicilio = [hoja['domicilio_index'][0], hoja['domicilio_index'][1]]
             limpiar_fn = hoja.get("limpiar")
             min_len = hoja.get("min_len")
-
             datos_hoja = self.registros.get(nombre_interno, [])
             contador = 0
             primer_mensaje = None
@@ -306,10 +334,11 @@ class BuscadorApp:
                 valor = dato[col_dni]
                 if limpiar_fn is not None:
                     valor = limpiar_fn(valor, min_len)
-                    dato[col_dni] = valor  # cachear, igual que en el script original
+                    dato[col_dni] = valor
 
                 if valor == dni_buscar:
                     encontrado = True
+                    domicilio = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
                     contador += 1
                     if contador == 1:
                         try:
@@ -330,6 +359,29 @@ class BuscadorApp:
             self._escribir_resultado(
                 f"El DNI ingresado {dni_buscar} no se encontro en las bases de datos."
             )
+        else:
+            for hoja in SHEETS_CONFIG:
+                col_dni = hoja["col_dni"]
+                nombre_interno = hoja["nombre_interno"]
+                col_domicilio = [hoja['domicilio_index'][0] ,hoja['domicilio_index'][1]]
+                limpiar_fn = hoja.get("limpiar")
+                min_len = hoja.get("min_len")
+                datos_hoja = self.registros.get(nombre_interno, [])
+                contador = 0
+                primer_mensaje = None
+                for dato in datos_hoja:
+                    valor = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
+                    dni = dato[col_dni]
+                    if valor == domicilio and dni != dni_buscar:
+                        try:
+                            primer_mensaje = hoja["formatear"](dato)
+                            self._escribir_resultado(primer_mensaje)
+                        except IndexError:
+                            primer_mensaje = (
+                                f"(Fila encontrada en {nombre_interno} pero con "
+                                f"columnas insuficientes para mostrar el detalle)"
+                            )
+          
 
     def _escribir_resultado(self, texto, limpiar=False):
         self.resultado_text.config(state="normal")
