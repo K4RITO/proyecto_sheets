@@ -204,7 +204,7 @@ class BuscadorApp:
         fila_busqueda_dni = ttk.Frame(contenedor)
         fila_busqueda_dni.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda_dni, text="DNI:").pack(side="left")
+        ttk.Label(fila_busqueda_dni, text="Numero de DNI:").pack(side="left")
 
         validar_dni = (self.root.register(self._validar_entrada_dni), "%P")
         self.dni_var = tk.StringVar()
@@ -215,7 +215,7 @@ class BuscadorApp:
         self.dni_entry.pack(side="left", padx=(6, 6))
         self.dni_entry.bind("<Return>", lambda e: self.buscar_dni())
 
-        self.btn_buscar = ttk.Button(fila_busqueda_dni, text="Buscar", command=self.buscar_dni)
+        self.btn_buscar = ttk.Button(fila_busqueda_dni, text="Buscar por DNI", command=self.buscar_dni)
         self.btn_buscar.pack(side="left", padx=(0, 6))
 
         # --- Fila de busqueda por Nombre y apellido---
@@ -233,7 +233,7 @@ class BuscadorApp:
         self.nombre_entry.pack(side="left", padx=(6, 6))
         self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
 
-        self.btn_buscar_nombre = ttk.Button(fila_busqueda_nombre, text="Buscar", command=self.buscar_nombre)
+        self.btn_buscar_nombre = ttk.Button(fila_busqueda_nombre, text="Buscar por apellido y nombre", command=self.buscar_nombre)
         self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
 
         # --- Fila de busqueda por Calle y Altura---
@@ -251,14 +251,10 @@ class BuscadorApp:
         self.domicilio_entry.pack(side="left", padx=(6, 6))
         self.domicilio_entry.bind("<Return>", lambda e: self.buscar_domicilio())
 
-        self.btn_buscar_domicilio = ttk.Button(fila_busqueda_domicilio, text="Buscar", command=self.buscar_domicilio)
+        self.btn_buscar_domicilio = ttk.Button(fila_busqueda_domicilio, text="Buscar por calle y altura", command=self.buscar_domicilio)
         self.btn_buscar_domicilio.pack(side="left", padx=(0, 6))
 
         # --- Boton actualizar bases de datos ---
-        self.btn_actualizar = ttk.Button(
-            fila_busqueda_domicilio, text="Actualizar bases de datos", command=self.actualizar_bases
-        )
-        self.btn_actualizar.pack(side="left")
 
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
@@ -276,6 +272,11 @@ class BuscadorApp:
             fila_busqueda_descargar_resultados, text="Descargar resultados", command=self.descargar_resultados
         )
         self.btn_descargar_resultados.pack(side="left")
+        
+        self.btn_actualizar = ttk.Button(
+            fila_busqueda_descargar_resultados, text="Actualizar bases de datos", command=self.actualizar_bases
+        )
+        self.btn_actualizar.pack(side="right")
 
     # --- Validaciones ---
 
@@ -332,6 +333,11 @@ class BuscadorApp:
         self.btn_buscar.config(state=estado)
         self.btn_actualizar.config(state=estado)
         self.dni_entry.config(state=estado)
+        self.nombre_entry.config(state=estado)
+        self.btn_buscar_nombre.config(state=estado)
+        self.domicilio_entry.config(state=estado)
+        self.btn_buscar_domicilio.config(state=estado)
+        self.btn_descargar_resultados.config(state=estado)
 
     # ------------------------------------------------------------------
     # Boton: actualizar bases
