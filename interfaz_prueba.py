@@ -1,32 +1,22 @@
 """
 Buscador de beneficiarios IMDEL - Interfaz Tkinter
 ----------------------------------------------------
-Interfaz grafica simple para buscar un DNI en las distintas hojas de
-la planilla "Tablas IMDEL Prototipo" y mostrar en que programas figura
-como beneficiario. Tambien permite actualizar las bases de datos
-(volver a traer los datos desde Google Sheets) con un boton.
-
-Reemplazá CREDENTIALS_FILE por el nombre real de tu archivo de
-credenciales de la cuenta de servicio si cambia.
+Interfaz grafica para buscar un beneficiario de los distintos programas del IMDEL 
+en las distintas hojas de la planilla "Tablas IMDEL Prototipo 2" 
+mostrar en que programas figura como beneficiario. 
 """
 
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+import re
 
 import gspread
 
-# ------------------------------------------------------------------
 # Configuracion de conexion
-# ------------------------------------------------------------------
 CREDENTIALS_FILE = "proyecto-sheets-505320-bb8ae069f096.json"
 SHEET_NAME = "Tablas IMDEL Prototipo 2"
 
-
-# ------------------------------------------------------------------
-# Funciones de limpieza de DNI (replican la logica del script original
-# para las hojas donde el DNI viene mezclado con otro texto)
-# ------------------------------------------------------------------
 def _limpiar_recorte(valor, min_len):
     """Extrae los digitos de un valor y descarta los primeros 2 y el
     ultimo digito encontrado. Usado en formulario_inscripcion y
@@ -50,6 +40,7 @@ def _limpiar_solo_digitos(valor, min_len):
 #   - nombre_interno: clave para guardar los datos cargados
 #   - worksheet_index: indice de la hoja dentro del Google Sheet (0-based)
 #   - col_dni: indice de la columna donde esta el DNI (0-based)
+#   - domicilio_index: posicion en la tabla de los campos domicilio y altura
 #   - limpiar: funcion opcional (valor, min_len) -> valor limpio,
 #              aplicada antes de comparar (y se cachea en la fila,
 #              igual que en el script original)
@@ -127,8 +118,25 @@ SHEETS_CONFIG = [
         ),
     },
     {
-        "nombre_interno": "PRODUCTORES",
+        "nombre_interno": "AVICULTURA EN COMUNIDAD",
         "worksheet_index": 4,
+        "col_dni": 0,
+        "domicilio_index": (3, 4),
+        "limpiar": _limpiar_recorte,
+        "min_len": 9,
+        "formatear": lambda dato: (
+            f"Apellido y nombre: {dato[1]} {dato[2]}\n"
+            f"Coordinacion: Desarrollo agrario\n"
+            f"Programa: Avicultura en comunidad\n"
+            "Datos de contacto:\n"
+            f"Telefono: {dato[5]}\n"
+            f"Email: {dato[6]}\n"
+            f"Domicilio: {dato[3]} {dato[4]}"
+        ),
+    },    
+    {
+        "nombre_interno": "PRODUCTORES",
+        "worksheet_index": 5,
         "col_dni": 0,
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
@@ -142,31 +150,7 @@ SHEETS_CONFIG = [
             f"Email: {dato[6]}\n"
             f"Domicilio: {dato[3]} {dato[4]}"
         ),
-    },
-    # {
-    #     "nombre_interno": "nominalizacion",
-    #     "worksheet_index": 5,
-    #     "col_dni": 9,
-    #     "limpiar": _limpiar_recorte,
-    #     "min_len": 9,
-    #     "formatear": lambda dato: (
-    #         f"Apellido y nombre: {dato[7]} {dato[8]}\n"
-    #         f"Coordinacion: Capacitacion laboral y empleo\n"
-    #         f"Programa: Plan fines"
-    #     ),
-    # },
-    # {
-    #     "nombre_interno": "usuarios",
-    #     "worksheet_index": 6,
-    #     "col_dni": 5,
-    #     "limpiar": _limpiar_recorte,
-    #     "min_len": 9,
-    #     "formatear": lambda dato: (
-    #         f"Apellido y nombre: {dato[2]} {dato[1]}\n"
-    #         f"Coordinacion: Economia popular\n"
-    #         f"Programa: Registro de Trabajadores de la Economia Popular"
-    #     ),
-    # },
+    }, 
 ]
 
 
@@ -201,7 +185,7 @@ class BuscadorApp:
         estado_label = ttk.Label(contenedor, textvariable=self.estado_var, foreground="gray")
         estado_label.pack(anchor="w", pady=(0, 8))
 
-        # --- Fila de busqueda ---
+        # --- Fila de busqueda por DNI---
         fila_busqueda = ttk.Frame(contenedor)
         fila_busqueda.pack(fill="x", pady=(0, 8))
 
@@ -219,6 +203,25 @@ class BuscadorApp:
         self.btn_buscar = ttk.Button(fila_busqueda, text="Buscar", command=self.buscar_dni)
         self.btn_buscar.pack(side="left", padx=(0, 6))
 
+        # --- Fila de busqueda por Nombre y apellido---
+        fila_busqueda = ttk.Frame(contenedor)
+        fila_busqueda.pack(fill="x", pady=(0, 8))
+
+        ttk.Label(fila_busqueda, text="Apellido y Nombre:").pack(side="left")
+
+        validar_nombre = (self.root.register(self._validar_entrada_nombre), "%P")
+        self.nombre_var = tk.StringVar()
+        self.nombre_entry = ttk.Entry(
+            fila_busqueda, textvariable=self.nombre_var, width=20,
+            validate="key", validatecommand=validar_nombre,
+        )
+        self.nombre_entry.pack(side="left", padx=(6, 6))
+        self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
+
+        self.btn_buscar_nombre = ttk.Button(fila_busqueda, text="Buscar", command=self.buscar_nombre)
+        self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
+
+        # --- Boton actualizar bases de datos ---
         self.btn_actualizar = ttk.Button(
             fila_busqueda, text="Actualizar bases de datos", command=self.actualizar_bases
         )
@@ -231,9 +234,14 @@ class BuscadorApp:
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
+    # --- Validaciones ---
+
     def _validar_entrada_dni(self, valor_propuesto):
         # Permite vacio (para poder borrar) o solo digitos
         return valor_propuesto == "" or valor_propuesto.isdigit()
+
+    def _validar_entrada_nombre(self, valor_propuesto):
+        return valor_propuesto == "" or valor_propuesto.replace(" ", "").isalpha()
 
     # ------------------------------------------------------------------
     # Conexion y carga de datos
@@ -359,29 +367,108 @@ class BuscadorApp:
             self._escribir_resultado(
                 f"El DNI ingresado {dni_buscar} no se encontro en las bases de datos."
             )
+        # Busqueda concatenada de domicilio
         else:
-            for hoja in SHEETS_CONFIG:
-                col_dni = hoja["col_dni"]
-                nombre_interno = hoja["nombre_interno"]
-                col_domicilio = [hoja['domicilio_index'][0] ,hoja['domicilio_index'][1]]
-                limpiar_fn = hoja.get("limpiar")
-                min_len = hoja.get("min_len")
-                datos_hoja = self.registros.get(nombre_interno, [])
-                contador = 0
-                primer_mensaje = None
-                for dato in datos_hoja:
-                    valor = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
-                    dni = dato[col_dni]
-                    if valor == domicilio and dni != dni_buscar:
+            # Verificamos que el valor de domicilio sea un valor util para realizar la busqueda.
+            if (len(domicilio) > 3):
+                for hoja in SHEETS_CONFIG:
+                    col_dni = hoja["col_dni"]
+                    nombre_interno = hoja["nombre_interno"]
+                    col_domicilio = [hoja['domicilio_index'][0] ,hoja['domicilio_index'][1]]
+                    limpiar_fn = hoja.get("limpiar")
+                    min_len = hoja.get("min_len")
+                    datos_hoja = self.registros.get(nombre_interno, [])
+                    contador = 0
+                    primer_mensaje = None
+                    for dato in datos_hoja:
+                        valor = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
+                        dni = dato[col_dni]
+                        if valor == domicilio and dni != dni_buscar:
+                            try:
+                                primer_mensaje = hoja["formatear"](dato)
+                                self._escribir_resultado(primer_mensaje)
+                            except IndexError:
+                                primer_mensaje = (
+                                    f"(Fila encontrada en {nombre_interno} pero con "
+                                    f"columnas insuficientes para mostrar el detalle)"
+                                )
+
+    def buscar_nombre(self):
+        if not self.conectado:
+            messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
+            return
+
+        nombre_buscar = self.nombre_var.get().strip().lower()
+        if not nombre_buscar:
+            messagebox.showwarning("Nombre invalido", "Debe ingresar texto (ej: Benitez Nicolas).")
+            return
+
+        if len(nombre_buscar.split()) < 2:
+            messagebox.showwarning("Entrada invalida", "Debe ingresar 2 palabras (ej: Benitez Nicolas).")
+            return
+
+        self._escribir_resultado("", limpiar=True)
+        encontrado = False
+        print(nombre_buscar)
+
+        for hoja in SHEETS_CONFIG:
+            col_nombre = 1
+            col_apellido = 2
+            nombre_interno = hoja["nombre_interno"]
+            # limpiar_fn = hoja.get("limpiar")
+            # min_len = hoja.get("min_len")
+            datos_hoja = self.registros.get(nombre_interno, [])
+            contador = 0
+            primer_mensaje = None
+
+            for dato in datos_hoja:
+                if len(dato) <= col_nombre:
+                    continue
+
+                if (len(dato[col_apellido]) < 1 or len(dato[col_nombre]) < 1):
+                    continue
+                # entra aca cuando hay un espacio
+                if (not dato[col_apellido].split()[0].isalpha() or not dato[col_nombre].split()[0].isalpha()):
+                    continue
+
+                # print(dato[col_apellido])
+                # print(re.match(r'\w+', dato[col_apellido]))
+                primer_apellido = re.match(r'\w+', dato[col_apellido].strip()).group().lower()
+                # print(primer_apellido)
+                primer_nombre = re.match(r'\w+', dato[col_nombre].strip()).group().lower()
+
+                valor = f"{primer_apellido} {primer_nombre}"
+
+                # TODO: validar si es necesario limpiar el string
+                # if limpiar_fn is not None:
+                #     # valor = limpiar_fn(valor, min_len)
+                #     dato[col_dni] = valor
+                if valor == nombre_buscar:
+                    encontrado = True
+                    contador += 1
+                    if contador == 1:
                         try:
-                            primer_mensaje = hoja["formatear"](dato)
-                            self._escribir_resultado(primer_mensaje)
+                            dato[1] = dato[1].capitalize()
+                            dato[2] = dato[2].capitalize()
+                            primer_mensaje = f"DNI: {dato[0]} \n{hoja["formatear"](dato)} \n{"-" * 40}"
                         except IndexError:
                             primer_mensaje = (
                                 f"(Fila encontrada en {nombre_interno} pero con "
                                 f"columnas insuficientes para mostrar el detalle)"
                             )
-          
+                    else:
+                        dato[1] = dato[1].capitalize()
+                        dato[2] = dato[2].capitalize()
+                        primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja["formatear"](dato)} \n{"-" * 40}"
+
+            if contador > 0:
+                self._escribir_resultado(primer_mensaje)
+                # self._escribir_resultado("-" * 40)
+
+        if not encontrado:
+            self._escribir_resultado(
+                f"El Nombre y apellido ingresado '{nombre_buscar.capitalize()}' no se encontro en las bases de datos."
+            )     
 
     def _escribir_resultado(self, texto, limpiar=False):
         self.resultado_text.config(state="normal")
