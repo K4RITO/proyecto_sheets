@@ -252,6 +252,8 @@ class BuscadorApp:
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
+        # ---
+
     # --- Validaciones ---
 
     def _validar_entrada_dni(self, valor_propuesto):
@@ -388,32 +390,7 @@ class BuscadorApp:
             self._escribir_resultado(
                 f"El DNI ingresado {dni_buscar} no se encontro en las bases de datos."
             )
-        # Busqueda concatenada de domicilio
-        else:
-            # Verificamos que el valor de domicilio sea un valor util para realizar la busqueda.
-            if (len(domicilio) > 3):
-                for hoja in SHEETS_CONFIG:
-                    col_dni = hoja["col_dni"]
-                    nombre_interno = hoja["nombre_interno"]
-                    col_domicilio = [hoja['domicilio_index'][0] ,hoja['domicilio_index'][1]]
-                    limpiar_fn = hoja.get("limpiar")
-                    min_len = hoja.get("min_len")
-                    datos_hoja = self.registros.get(nombre_interno, [])
-                    contador = 0
-                    primer_mensaje = None
-                    for dato in datos_hoja:
-                        valor = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
-                        dni = dato[col_dni]
-                        if valor == domicilio and dni != dni_buscar:
-                            try:
-                                primer_mensaje = hoja["formatear"](dato)
-                                self._escribir_resultado(primer_mensaje)
-                            except IndexError:
-                                primer_mensaje = (
-                                    f"(Fila encontrada en {nombre_interno} pero con "
-                                    f"columnas insuficientes para mostrar el detalle)"
-                                )
-
+        
     def buscar_nombre(self):
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
