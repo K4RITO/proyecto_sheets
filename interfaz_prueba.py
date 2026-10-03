@@ -10,6 +10,9 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import re
+import csv
+import os
+from datetime import datetime
 
 import gspread
 
@@ -56,6 +59,8 @@ SHEETS_CONFIG = [
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
+        "Coordinacion": "Capacitación laboral y empleo",
+        "Programa": "Capacitación laboral",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[2]} {dato[1]}\n"
             f"Coordinacion: Capacitación laboral y empleo\n"
@@ -72,7 +77,9 @@ SHEETS_CONFIG = [
         "col_dni": 0,
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
-        "min_len": 9,
+        "min_len": 9,            
+        "Coordinacion":"Capacitación laboral y empleo",
+        "Programa":"Inserción laboral",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[1]} {dato[2]}\n"
             f"Coordinacion: Capacitación laboral y empleo\n"
@@ -90,6 +97,8 @@ SHEETS_CONFIG = [
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
+        "Coordinacion": "Capacitacón laboral y empleo",
+        "Programa": "Plan FINES",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[2]} {dato[1]}\n"
             f"Coordinacion: Capacitacón laboral y empleo\n"
@@ -107,6 +116,8 @@ SHEETS_CONFIG = [
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
+        "Coordinacion": "Desarrollo agrario",
+        "Programa": "Huertas familiares - Entregas KIT de semillas",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[2]} {dato[1]}\n"
             f"Coordinacion: Desarrollo agrario\n"
@@ -124,6 +135,8 @@ SHEETS_CONFIG = [
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
+        "Coordinacion": "Desarrollo agrario",
+        "Programa": "Avicultura en comunidad",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[1]} {dato[2]}\n"
             f"Coordinacion: Desarrollo agrario\n"
@@ -141,6 +154,8 @@ SHEETS_CONFIG = [
         "domicilio_index": (3, 4),
         "limpiar": _limpiar_recorte,
         "min_len": 9,
+        "Coordinacion": "Desarrollo agrario",
+        "Programa": "RETEP - Registro de trabajadores de la economía popular",
         "formatear": lambda dato: (
             f"Apellido y nombre: {dato[1]} {dato[2]}\n"
             f"Coordinacion: Desarrollo agrario\n"
@@ -158,7 +173,7 @@ class BuscadorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Buscador de beneficiarios - IMDEL")
-        self.root.geometry("640x560")
+        self.root.geometry("800x600")
         self.root.resizable(True, True)
 
         # Estado interno
@@ -186,62 +201,62 @@ class BuscadorApp:
         estado_label.pack(anchor="w", pady=(0, 8))
 
         # --- Fila de busqueda por DNI---
-        fila_busqueda = ttk.Frame(contenedor)
-        fila_busqueda.pack(fill="x", pady=(0, 8))
+        fila_busqueda_dni = ttk.Frame(contenedor)
+        fila_busqueda_dni.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda, text="DNI:").pack(side="left")
+        ttk.Label(fila_busqueda_dni, text="DNI:").pack(side="left")
 
         validar_dni = (self.root.register(self._validar_entrada_dni), "%P")
         self.dni_var = tk.StringVar()
         self.dni_entry = ttk.Entry(
-            fila_busqueda, textvariable=self.dni_var, width=20,
+            fila_busqueda_dni, textvariable=self.dni_var, width=20,
             validate="key", validatecommand=validar_dni,
         )
         self.dni_entry.pack(side="left", padx=(6, 6))
         self.dni_entry.bind("<Return>", lambda e: self.buscar_dni())
 
-        self.btn_buscar = ttk.Button(fila_busqueda, text="Buscar", command=self.buscar_dni)
+        self.btn_buscar = ttk.Button(fila_busqueda_dni, text="Buscar", command=self.buscar_dni)
         self.btn_buscar.pack(side="left", padx=(0, 6))
 
         # --- Fila de busqueda por Nombre y apellido---
-        fila_busqueda = ttk.Frame(contenedor)
-        fila_busqueda.pack(fill="x", pady=(0, 8))
+        fila_busqueda_nombre = ttk.Frame(contenedor)
+        fila_busqueda_nombre.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda, text="Apellido y Nombre:").pack(side="left")
+        ttk.Label(fila_busqueda_nombre, text="Apellido y Nombre:").pack(side="left")
 
         validar_nombre = (self.root.register(self._validar_entrada_nombre), "%P")
         self.nombre_var = tk.StringVar()
         self.nombre_entry = ttk.Entry(
-            fila_busqueda, textvariable=self.nombre_var, width=20,
+            fila_busqueda_nombre, textvariable=self.nombre_var, width=20,
             validate="key", validatecommand=validar_nombre,
         )
         self.nombre_entry.pack(side="left", padx=(6, 6))
         self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
 
-        self.btn_buscar_nombre = ttk.Button(fila_busqueda, text="Buscar", command=self.buscar_nombre)
+        self.btn_buscar_nombre = ttk.Button(fila_busqueda_nombre, text="Buscar", command=self.buscar_nombre)
         self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
 
         # --- Fila de busqueda por Calle y Altura---
-        fila_busqueda = ttk.Frame(contenedor)
-        fila_busqueda.pack(fill="x", pady=(0, 8))
+        fila_busqueda_domicilio = ttk.Frame(contenedor)
+        fila_busqueda_domicilio.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda, text="Calle y Altura:").pack(side="left")
+        ttk.Label(fila_busqueda_domicilio, text="Calle y Altura:").pack(side="left")
 
         validar_domicilio = (self.root.register(self._validar_entrada_domicilio), "%P")
         self.domicilio_var = tk.StringVar()
         self.domicilio_entry = ttk.Entry(
-            fila_busqueda, textvariable=self.domicilio_var, width=20,
+            fila_busqueda_domicilio, textvariable=self.domicilio_var, width=20,
             validate="key", validatecommand=validar_domicilio,
         )
         self.domicilio_entry.pack(side="left", padx=(6, 6))
         self.domicilio_entry.bind("<Return>", lambda e: self.buscar_domicilio())
 
-        self.btn_buscar_domicilio = ttk.Button(fila_busqueda, text="Buscar", command=self.buscar_domicilio)
+        self.btn_buscar_domicilio = ttk.Button(fila_busqueda_domicilio, text="Buscar", command=self.buscar_domicilio)
         self.btn_buscar_domicilio.pack(side="left", padx=(0, 6))
 
         # --- Boton actualizar bases de datos ---
         self.btn_actualizar = ttk.Button(
-            fila_busqueda, text="Actualizar bases de datos", command=self.actualizar_bases
+            fila_busqueda_domicilio, text="Actualizar bases de datos", command=self.actualizar_bases
         )
         self.btn_actualizar.pack(side="left")
 
@@ -252,7 +267,15 @@ class BuscadorApp:
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
-        # ---
+        # --- Boton para imprimir resultados ---
+        self.resultados_guardados = ""
+        fila_busqueda_descargar_resultados = ttk.Frame(contenedor)
+        fila_busqueda_descargar_resultados.pack(fill="x", pady=(0, 8))
+
+        self.btn_descargar_resultados = ttk.Button(
+            fila_busqueda_descargar_resultados, text="Descargar resultados", command=self.descargar_resultados
+        )
+        self.btn_descargar_resultados.pack(side="left")
 
     # --- Validaciones ---
 
@@ -332,7 +355,7 @@ class BuscadorApp:
             self.root.after(0, lambda: self._set_controles_habilitados(True))
 
     # ------------------------------------------------------------------
-    # Boton: buscar DNI
+    # Botones de busqueda: 
     # ------------------------------------------------------------------
     def buscar_dni(self):
         if not self.conectado:
@@ -346,12 +369,10 @@ class BuscadorApp:
 
         self._escribir_resultado("", limpiar=True)
         encontrado = False
-        domicilio = ""
 
         for hoja in SHEETS_CONFIG:
             col_dni = hoja["col_dni"]
             nombre_interno = hoja["nombre_interno"]
-            col_domicilio = [hoja['domicilio_index'][0], hoja['domicilio_index'][1]]
             limpiar_fn = hoja.get("limpiar")
             min_len = hoja.get("min_len")
             datos_hoja = self.registros.get(nombre_interno, [])
@@ -369,7 +390,8 @@ class BuscadorApp:
 
                 if valor == dni_buscar:
                     encontrado = True
-                    domicilio = f"{dato[col_domicilio[0]]} {dato[col_domicilio[1]]}"
+                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                    self.guardar_resultados(campos_guardar)
                     contador += 1
                     if contador == 1:
                         try:
@@ -407,6 +429,7 @@ class BuscadorApp:
 
         self._escribir_resultado("", limpiar=True)
         encontrado = False
+        coincidencias = []
 
         for hoja in SHEETS_CONFIG:
             col_nombre = 1
@@ -442,6 +465,8 @@ class BuscadorApp:
                 #     dato[col_dni] = valor
                 if valor == nombre_buscar:
                     encontrado = True
+                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                    coincidencias.append(campos_guardar)
                     contador += 1
                     if contador == 1:
                         try:
@@ -461,7 +486,9 @@ class BuscadorApp:
             if contador > 0:
                 self._escribir_resultado(primer_mensaje)
                 # self._escribir_resultado("-" * 40)
-
+        
+        self.guardar_resultados(coincidencias)
+        
         if not encontrado:
             self._escribir_resultado(
                 f"El Nombre y apellido ingresado '{nombre_buscar.capitalize()}' no se encontro en las bases de datos."
@@ -483,7 +510,7 @@ class BuscadorApp:
     
             self._escribir_resultado("", limpiar=True)
             encontrado = False
-            # print(domicilio_buscar)
+            coincidencias = []
     
             for hoja in SHEETS_CONFIG:
                 col_calle = 3
@@ -506,13 +533,14 @@ class BuscadorApp:
                         continue
     
                     valor = f"{dato[col_calle].lower()} {dato[col_altura]}"
-                    print(valor, domicilio_buscar, valor == domicilio_buscar)
                     # TODO: validar si es necesario limpiar el string
                     # if limpiar_fn is not None:
                     #     # valor = limpiar_fn(valor, min_len)
                     #     dato[col_dni] = valor
                     if valor == domicilio_buscar:
                         encontrado = True
+                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                        coincidencias.append(campos_guardar)
                         contador += 1
                         if contador == 1:
                             try:
@@ -532,14 +560,24 @@ class BuscadorApp:
                 if contador > 0:
                     self._escribir_resultado(primer_mensaje)
                     # self._escribir_resultado("-" * 40)
-    
+            
+            self.guardar_resultados(coincidencias)
+
             if not encontrado:
                 self._escribir_resultado(
                     f"El Domicilio ingresado '{domicilio_buscar.capitalize()}' no se encontro en las bases de datos."
                 )    
 
+    # ------------------------------------------------------------------
+    # Funciones de los resultados: 
+    # ------------------------------------------------------------------
+
+    def guardar_resultados(self, datos):
+        self.resultados_guardados = datos
+
     def _escribir_resultado(self, texto, limpiar=False):
         self.resultado_text.config(state="normal")
+
         if limpiar:
             self.resultado_text.delete("1.0", "end")
         else:
@@ -547,6 +585,33 @@ class BuscadorApp:
         self.resultado_text.config(state="disabled")
         self.resultado_text.see("end")
 
+    def descargar_resultados(self):
+        # formatear el texto : resultado_text
+        # en resultado_text se guarda el resultado actual
+        # Obtener carpeta Descargas del usuario
+        carpeta_descargas = os.path.join(os.path.expanduser("~"), "Downloads")
+
+        fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        nombre_archivo = f"Registros de busqueda de beneficiarios - {fecha}hs.csv"
+
+        # Ruta completa del archivo
+        ruta_archivo = os.path.join(carpeta_descargas, nombre_archivo)
+
+        # Encabezados del archivo CSV
+        encabezados = ['DNI', 'Nombre', 'Apellido', 'Calle', 'Altura', 'Numero Telefono', 'Email', 'Coordinacion', 'Programa']
+        
+        with open(ruta_archivo, "w", newline="", encoding="utf-8") as archivo:
+            escritor = csv.writer(archivo)
+
+            escritor.writerow(encabezados)
+
+            for registro in self.resultados_guardados:
+                escritor.writerow(registro)
+
+        messagebox.showinfo(
+            "Descarga completada",
+            f"El archivo se guardó correctamente en:\n{ruta_archivo}"
+        )
 
 def main():
     root = tk.Tk()
