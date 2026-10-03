@@ -478,7 +478,7 @@ class BuscadorApp:
                         try:
                             dato[1] = dato[1].capitalize()
                             dato[2] = dato[2].capitalize()
-                            primer_mensaje = f"DNI: {dato[0]} \n{hoja["formatear"](dato)} \n{"-" * 40}"
+                            primer_mensaje = f"DNI: {dato[0]} \n{hoja['formatear'](dato)} \n{'-'* 40}"
                         except IndexError:
                             primer_mensaje = (
                                 f"(Fila encontrada en {nombre_interno} pero con "
@@ -487,7 +487,7 @@ class BuscadorApp:
                     else:
                         dato[1] = dato[1].capitalize()
                         dato[2] = dato[2].capitalize()
-                        primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja["formatear"](dato)} \n{"-" * 40}"
+                        primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja['formatear'](dato)} \n{'-' * 40}"
 
             if contador > 0:
                 self._escribir_resultado(primer_mensaje)
@@ -552,7 +552,7 @@ class BuscadorApp:
                             try:
                                 dato[1] = dato[1].capitalize()
                                 dato[2] = dato[2].capitalize()
-                                primer_mensaje = f"DNI: {dato[0]} \n{hoja["formatear"](dato)} \n{"-" * 40}"
+                                primer_mensaje = f"DNI: {dato[0]} \n{hoja['formatear'](dato)} \n{'-' * 40}"
                             except IndexError:
                                 primer_mensaje = (
                                     f"(Fila encontrada en {nombre_interno} pero con "
@@ -561,7 +561,7 @@ class BuscadorApp:
                         else:
                             dato[1] = dato[1].capitalize()
                             dato[2] = dato[2].capitalize()
-                            primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja["formatear"](dato)} \n{"-" * 40}"
+                            primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja['formatear'](dato)} \n{'-' * 40}"
     
                 if contador > 0:
                     self._escribir_resultado(primer_mensaje)
@@ -595,8 +595,9 @@ class BuscadorApp:
         # formatear el texto : resultado_text
         # en resultado_text se guarda el resultado actual
         # Obtener carpeta Descargas del usuario
-        carpeta_descargas = os.path.join(os.path.expanduser("~"), "Downloads")
-
+        carpeta_descargas = r"C:\Reportes IMDEL"
+        if not os.path.exists(carpeta_descargas):
+            os.makedirs(carpeta_descargas)
         fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         nombre_archivo = f"Registros de busqueda de beneficiarios - {fecha}hs.csv"
 
