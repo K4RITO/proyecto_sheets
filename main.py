@@ -38,19 +38,6 @@ def _limpiar_solo_digitos(valor, min_len):
         return "".join(c for c in valor if c.isdigit())
     return valor
 
-# Configuracion de cada hoja
-# Cada entrada define:
-#   - nombre_interno: clave para guardar los datos cargados
-#   - worksheet_index: indice de la hoja dentro del Google Sheet (0-based)
-#   - col_dni: indice de la columna donde esta el DNI (0-based)
-#   - domicilio_index: posicion en la tabla de los campos domicilio y altura
-#   - limpiar: funcion opcional (valor, min_len) -> valor limpio,
-#              aplicada antes de comparar (y se cachea en la fila,
-#              igual que en el script original)
-#   - min_len: longitud minima para disparar la limpieza (si aplica)
-#   - formatear: funcion que recibe la fila (dato) y devuelve el texto
-#                a mostrar cuando hay coincidencia
-# ------------------------------------------------------------------
 SHEETS_CONFIG = [
     {
         "nombre_interno": "INSCRIPCIÓN CUATRIMESTRAL CAPACITACION EN OFICIOS",
@@ -146,7 +133,7 @@ SHEETS_CONFIG = [
             f"Email: {dato[6]}\n"
             f"Domicilio: {dato[3]} {dato[4]}"
         ),
-    },    
+    },     
     {
         "nombre_interno": "PRODUCTORES",
         "worksheet_index": 5,
@@ -173,7 +160,7 @@ class BuscadorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Buscador de beneficiarios - IMDEL")
-        self.root.geometry("800x600")
+        self.root.geometry("800x650")
         self.root.resizable(True, True)
 
         # Estado interno
@@ -200,7 +187,7 @@ class BuscadorApp:
         estado_label = ttk.Label(contenedor, textvariable=self.estado_var, foreground="gray")
         estado_label.pack(anchor="w", pady=(0, 8))
 
-        # --- Fila de busqueda por DNI---
+        # --- Fila de busqueda por DNI ---
         fila_busqueda_dni = ttk.Frame(contenedor)
         fila_busqueda_dni.pack(fill="x", pady=(0, 8))
 
@@ -218,17 +205,31 @@ class BuscadorApp:
         self.btn_buscar = ttk.Button(fila_busqueda_dni, text="Buscar por DNI", command=self.buscar_dni)
         self.btn_buscar.pack(side="left", padx=(0, 6))
 
-        # --- Fila de busqueda por Nombre y apellido---
+        # --- Fila de busqueda por Apellido ---
+        fila_busqueda_apellido = ttk.Frame(contenedor)
+        fila_busqueda_apellido.pack(fill="x", pady=(0, 8))
+
+        ttk.Label(fila_busqueda_apellido, text="Apellido:").pack(side="left")
+
+        validar_texto = (self.root.register(self._validar_entrada_nombre), "%P")
+        self.apellido_var = tk.StringVar()
+        self.apellido_entry = ttk.Entry(
+            fila_busqueda_apellido, textvariable=self.apellido_var, width=20,
+            validate="key", validatecommand=validar_texto,
+        )
+        self.apellido_entry.pack(side="left", padx=(6, 6))
+        self.apellido_entry.bind("<Return>", lambda e: self.buscar_nombre())
+
+        # --- Fila de busqueda por Nombre ---
         fila_busqueda_nombre = ttk.Frame(contenedor)
         fila_busqueda_nombre.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda_nombre, text="Apellido y Nombre:").pack(side="left")
+        ttk.Label(fila_busqueda_nombre, text="Nombre:").pack(side="left")
 
-        validar_nombre = (self.root.register(self._validar_entrada_nombre), "%P")
         self.nombre_var = tk.StringVar()
         self.nombre_entry = ttk.Entry(
             fila_busqueda_nombre, textvariable=self.nombre_var, width=20,
-            validate="key", validatecommand=validar_nombre,
+            validate="key", validatecommand=validar_texto,
         )
         self.nombre_entry.pack(side="left", padx=(6, 6))
         self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
@@ -236,7 +237,7 @@ class BuscadorApp:
         self.btn_buscar_nombre = ttk.Button(fila_busqueda_nombre, text="Buscar por apellido y nombre", command=self.buscar_nombre)
         self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
 
-        # --- Fila de busqueda por Calle y Altura---
+        # --- Fila de busqueda por Calle y Altura ---
         fila_busqueda_domicilio = ttk.Frame(contenedor)
         fila_busqueda_domicilio.pack(fill="x", pady=(0, 8))
 
@@ -254,19 +255,17 @@ class BuscadorApp:
         self.btn_buscar_domicilio = ttk.Button(fila_busqueda_domicilio, text="Buscar por calle y altura", command=self.buscar_domicilio)
         self.btn_buscar_domicilio.pack(side="left", padx=(0, 6))
 
-        # --- Boton actualizar bases de datos ---
-
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
         self.resultado_text = scrolledtext.ScrolledText(
-            contenedor, wrap="word", height=24, state="disabled", font=("Consolas", 10)
+            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 10)
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
-        # --- Boton para imprimir resultados ---
+        # --- Botones inferiores ---
         self.resultados_guardados = ""
         fila_busqueda_descargar_resultados = ttk.Frame(contenedor)
-        fila_busqueda_descargar_resultados.pack(fill="x", pady=(0, 8))
+        fila_busqueda_descargar_resultados.pack(fill="x", pady=(8, 0))
 
         self.btn_descargar_resultados = ttk.Button(
             fila_busqueda_descargar_resultados, text="Descargar resultados", command=self.descargar_resultados
@@ -281,7 +280,6 @@ class BuscadorApp:
     # --- Validaciones ---
 
     def _validar_entrada_dni(self, valor_propuesto):
-        # Permite vacio (para poder borrar) o solo digitos
         return valor_propuesto == "" or valor_propuesto.isdigit()
 
     def _validar_entrada_nombre(self, valor_propuesto):
@@ -333,6 +331,7 @@ class BuscadorApp:
         self.btn_buscar.config(state=estado)
         self.btn_actualizar.config(state=estado)
         self.dni_entry.config(state=estado)
+        self.apellido_entry.config(state=estado)
         self.nombre_entry.config(state=estado)
         self.btn_buscar_nombre.config(state=estado)
         self.domicilio_entry.config(state=estado)
@@ -361,7 +360,7 @@ class BuscadorApp:
             self.root.after(0, lambda: self._set_controles_habilitados(True))
 
     # ------------------------------------------------------------------
-    # Botones de busqueda: 
+    # Botones de busqueda
     # ------------------------------------------------------------------
     def buscar_dni(self):
         if not self.conectado:
@@ -424,13 +423,11 @@ class BuscadorApp:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
 
+        apellido_buscar = self.apellido_var.get().strip().lower()
         nombre_buscar = self.nombre_var.get().strip().lower()
-        if not nombre_buscar:
-            messagebox.showwarning("Nombre invalido", "Debe ingresar texto (ej: Benitez Nicolas).")
-            return
 
-        if len(nombre_buscar.split()) < 2:
-            messagebox.showwarning("Entrada invalida", "Debe ingresar 2 palabras (ej: Benitez Nicolas).")
+        if not apellido_buscar and not nombre_buscar:
+            messagebox.showwarning("Entrada invalida", "Debe ingresar al menos un apellido o un nombre.")
             return
 
         self._escribir_resultado("", limpiar=True)
@@ -441,141 +438,125 @@ class BuscadorApp:
             col_nombre = 1
             col_apellido = 2
             nombre_interno = hoja["nombre_interno"]
-            # limpiar_fn = hoja.get("limpiar")
-            # min_len = hoja.get("min_len")
             datos_hoja = self.registros.get(nombre_interno, [])
             contador = 0
-            primer_mensaje = None
+            primer_mensaje = ""
 
             for dato in datos_hoja:
-                if len(dato) <= col_nombre:
+                if len(dato) <= max(col_nombre, col_apellido):
                     continue
 
-                if (len(dato[col_apellido]) < 1 or len(dato[col_nombre]) < 1):
-                    continue
-                # entra aca cuando hay un espacio
-                if (not dato[col_apellido].split()[0].isalpha() or not dato[col_nombre].split()[0].isalpha()):
+                if not dato[col_apellido].strip() or not dato[col_nombre].strip():
                     continue
 
-                # print(dato[col_apellido])
-                # print(re.match(r'\w+', dato[col_apellido]))
-                primer_apellido = re.match(r'\w+', dato[col_apellido].strip()).group().lower()
-                # print(primer_apellido)
-                primer_nombre = re.match(r'\w+', dato[col_nombre].strip()).group().lower()
+                apellido_cell = dato[col_apellido].strip().lower()
+                nombre_cell = dato[col_nombre].strip().lower()
 
-                valor = f"{primer_apellido} {primer_nombre}"
+                # Condicion de coincidencia segun los campos llenos
+                coincide_apellido = apellido_buscar in apellido_cell if apellido_buscar else True
+                coincide_nombre = nombre_buscar in nombre_cell if nombre_buscar else True
 
-                # TODO: validar si es necesario limpiar el string
-                # if limpiar_fn is not None:
-                #     # valor = limpiar_fn(valor, min_len)
-                #     dato[col_dni] = valor
-                if valor == nombre_buscar:
+                if coincide_apellido and coincide_nombre:
                     encontrado = True
                     campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
                     coincidencias.append(campos_guardar)
                     contador += 1
+
+                    dato_formateado = list(dato)
+                    dato_formateado[1] = dato_formateado[1].capitalize()
+                    dato_formateado[2] = dato_formateado[2].capitalize()
+
+                    try:
+                        mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-'* 40}"
+                    except IndexError:
+                        mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
+
                     if contador == 1:
-                        try:
-                            dato[1] = dato[1].capitalize()
-                            dato[2] = dato[2].capitalize()
-                            primer_mensaje = f"DNI: {dato[0]} \n{hoja['formatear'](dato)} \n{'-'* 40}"
-                        except IndexError:
-                            primer_mensaje = (
-                                f"(Fila encontrada en {nombre_interno} pero con "
-                                f"columnas insuficientes para mostrar el detalle)"
-                            )
+                        primer_mensaje = mensaje_item
                     else:
-                        dato[1] = dato[1].capitalize()
-                        dato[2] = dato[2].capitalize()
-                        primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja['formatear'](dato)} \n{'-' * 40}"
+                        primer_mensaje += f"\n{mensaje_item}"
 
             if contador > 0:
                 self._escribir_resultado(primer_mensaje)
-                # self._escribir_resultado("-" * 40)
-        
+
         self.guardar_resultados(coincidencias)
         
         if not encontrado:
+            busqueda_str = f"{self.apellido_var.get().strip()} {self.nombre_var.get().strip()}".strip()
             self._escribir_resultado(
-                f"El Nombre y apellido ingresado '{nombre_buscar.capitalize()}' no se encontro en las bases de datos."
+                f"El registro '{busqueda_str}' no se encontro en las bases de datos."
             )     
 
     def buscar_domicilio(self):
-            if not self.conectado:
-                messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
-                return
-    
-            domicilio_buscar = self.domicilio_var.get().strip().lower()
-            if not domicilio_buscar:
-                messagebox.showwarning("Domicilio invalido", "Debe ingresar calle y altura (ej: Cnel. Pedro Aquino 2356).")
-                return
-    
-            if len(domicilio_buscar.split()) < 2:
-                messagebox.showwarning("Entrada invalida", "Debe ingresar minimo 2 palabras (ej: Cnel. Pedro Aquino 2356).")
-                return
-    
-            self._escribir_resultado("", limpiar=True)
-            encontrado = False
-            coincidencias = []
-    
-            for hoja in SHEETS_CONFIG:
-                col_calle = 3
-                col_altura = 4
-                nombre_interno = hoja["nombre_interno"]
-                # limpiar_fn = hoja.get("limpiar")
-                # min_len = hoja.get("min_len")
-                datos_hoja = self.registros.get(nombre_interno, [])
-                primer_mensaje = None
-                contador = 0
+        if not self.conectado:
+            messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
+            return
 
-                for dato in datos_hoja:
-                    if len(dato) <= col_calle:
-                        continue
+        domicilio_buscar = self.domicilio_var.get().strip().lower()
+        if not domicilio_buscar:
+            messagebox.showwarning("Domicilio invalido", "Debe ingresar calle y altura (ej: Cnel. Pedro Aquino 2356).")
+            return
 
-                    if (len(dato[col_calle]) < 1 or len(dato[col_altura]) < 1):
-                        continue
-                    # entra aca cuando hay un espacio
-                    if (not dato[col_calle].replace(" ", "").isalnum() or not dato[col_altura].split()[0].isdigit()):
-                        continue
-    
-                    valor = f"{dato[col_calle].lower()} {dato[col_altura]}"
-                    # TODO: validar si es necesario limpiar el string
-                    # if limpiar_fn is not None:
-                    #     # valor = limpiar_fn(valor, min_len)
-                    #     dato[col_dni] = valor
-                    if valor == domicilio_buscar:
-                        encontrado = True
-                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                        coincidencias.append(campos_guardar)
-                        contador += 1
-                        if contador == 1:
-                            try:
-                                dato[1] = dato[1].capitalize()
-                                dato[2] = dato[2].capitalize()
-                                primer_mensaje = f"DNI: {dato[0]} \n{hoja['formatear'](dato)} \n{'-' * 40}"
-                            except IndexError:
-                                primer_mensaje = (
-                                    f"(Fila encontrada en {nombre_interno} pero con "
-                                    f"columnas insuficientes para mostrar el detalle)"
-                                )
-                        else:
-                            dato[1] = dato[1].capitalize()
-                            dato[2] = dato[2].capitalize()
-                            primer_mensaje = primer_mensaje + f"\nDNI: {dato[0]}\n{hoja['formatear'](dato)} \n{'-' * 40}"
-    
-                if contador > 0:
-                    self._escribir_resultado(primer_mensaje)
-                    # self._escribir_resultado("-" * 40)
-            
-            self.guardar_resultados(coincidencias)
+        if len(domicilio_buscar.split()) < 2:
+            messagebox.showwarning("Entrada invalida", "Debe ingresar minimo 2 palabras (ej: Cnel. Pedro Aquino 2356).")
+            return
 
-            if not encontrado:
-                self._escribir_resultado(
-                    f"El Domicilio ingresado '{domicilio_buscar.capitalize()}' no se encontro en las bases de datos."
-                )    
+        self._escribir_resultado("", limpiar=True)
+        encontrado = False
+        coincidencias = []
+
+        for hoja in SHEETS_CONFIG:
+            col_calle = 3
+            col_altura = 4
+            nombre_interno = hoja["nombre_interno"]
+            datos_hoja = self.registros.get(nombre_interno, [])
+            primer_mensaje = ""
+            contador = 0
+
+            for dato in datos_hoja:
+                if len(dato) <= col_calle:
+                    continue
+
+                if not dato[col_calle] or not dato[col_altura]:
+                    continue
+
+                if not dato[col_calle].replace(" ", "").isalnum() or not dato[col_altura].split()[0].isdigit():
+                    continue
+
+                valor = f"{dato[col_calle].lower()} {dato[col_altura]}"
+
+                if valor == domicilio_buscar:
+                    encontrado = True
+                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                    coincidencias.append(campos_guardar)
+                    contador += 1
+
+                    dato_formateado = list(dato)
+                    dato_formateado[1] = dato_formateado[1].capitalize()
+                    dato_formateado[2] = dato_formateado[2].capitalize()
+
+                    try:
+                        mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
+                    except IndexError:
+                        mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
+
+                    if contador == 1:
+                        primer_mensaje = mensaje_item
+                    else:
+                        primer_mensaje += f"\n{mensaje_item}"
+
+            if contador > 0:
+                self._escribir_resultado(primer_mensaje)
+        
+        self.guardar_resultados(coincidencias)
+
+        if not encontrado:
+            self._escribir_resultado(
+                f"El Domicilio ingresado '{domicilio_buscar.capitalize()}' no se encontro en las bases de datos."
+            )    
 
     # ------------------------------------------------------------------
-    # Funciones de los resultados: 
+    # Funciones de los resultados
     # ------------------------------------------------------------------
 
     def guardar_resultados(self, datos):
@@ -592,24 +573,17 @@ class BuscadorApp:
         self.resultado_text.see("end")
 
     def descargar_resultados(self):
-        # formatear el texto : resultado_text
-        # en resultado_text se guarda el resultado actual
-        # Obtener carpeta Descargas del usuario
         carpeta_descargas = r"C:\Reportes IMDEL"
         if not os.path.exists(carpeta_descargas):
             os.makedirs(carpeta_descargas)
         fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         nombre_archivo = f"Registros de busqueda de beneficiarios - {fecha}hs.csv"
 
-        # Ruta completa del archivo
         ruta_archivo = os.path.join(carpeta_descargas, nombre_archivo)
-
-        # Encabezados del archivo CSV
         encabezados = ['DNI', 'Nombre', 'Apellido', 'Calle', 'Altura', 'Numero Telefono', 'Email', 'Coordinacion', 'Programa']
         
         with open(ruta_archivo, "w", newline="", encoding="utf-8") as archivo:
             escritor = csv.writer(archivo)
-
             escritor.writerow(encabezados)
 
             for registro in self.resultados_guardados:
