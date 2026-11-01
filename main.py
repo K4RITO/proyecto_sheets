@@ -9,6 +9,8 @@ mostrar en que programas figura como beneficiario.
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+import tkinter.font as tkfont
+
 import re
 import csv
 import os
@@ -155,6 +157,16 @@ SHEETS_CONFIG = [
     }, 
 ]
 
+def agrandar_fuentes(root, tamano=12):
+    # Fuentes por defecto de Tk: todos los widgets las usan
+    for nombre in ("TkDefaultFont", "TkTextFont", "TkMenuFont",
+                "TkHeadingFont", "TkCaptionFont", "TkFixedFont"):
+        tkfont.nametofont(nombre).configure(size=tamano)
+
+    # Treeview: la altura de fila no crece sola con la fuente
+    estilo = ttk.Style(root)
+    estilo.configure("Treeview", rowheight=int(tamano * 2.2))
+    estilo.configure("Treeview.Heading", font=("TkDefaultFont", tamano, "bold"))
 
 class BuscadorApp:
     def __init__(self, root):
@@ -178,6 +190,7 @@ class BuscadorApp:
     # ------------------------------------------------------------------
     # Construccion de la interfaz
     # ------------------------------------------------------------------
+
     def _armar_interfaz(self):
         contenedor = ttk.Frame(self.root, padding=12)
         contenedor.pack(fill="both", expand=True)
@@ -187,111 +200,104 @@ class BuscadorApp:
         estado_label = ttk.Label(contenedor, textvariable=self.estado_var, foreground="gray")
         estado_label.pack(anchor="w", pady=(0, 8))
 
-        # --- Fila de busqueda por DNI ---
-        fila_busqueda_dni = ttk.Frame(contenedor)
-        fila_busqueda_dni.pack(fill="x", pady=(0, 8))
+        # --- Grilla de busqueda: (label, entry, label2, entry2, button) ---
+        grilla = ttk.Frame(contenedor)
+        grilla.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda_dni, text="Numero de DNI:").pack(side="left")
+        # Las columnas de los entries se estiran; label y boton toman su ancho natural
+        grilla.columnconfigure(1, weight=1)
+        grilla.columnconfigure(3, weight=1)
+
+        opciones_label = {"sticky": "w", "padx": (0, 6), "pady": 4}
+        opciones_entry = {"sticky": "ew", "padx": (0, 12), "pady": 4}
+        opciones_boton = {"sticky": "ew", "pady": 4}
 
         validar_dni = (self.root.register(self._validar_entrada_dni), "%P")
-        self.dni_var = tk.StringVar()
-        self.dni_entry = ttk.Entry(
-            fila_busqueda_dni, textvariable=self.dni_var, width=20,
-            validate="key", validatecommand=validar_dni,
-        )
-        self.dni_entry.pack(side="left", padx=(6, 6))
-        self.dni_entry.bind("<Return>", lambda e: self.buscar_dni())
-
-        self.btn_buscar = ttk.Button(fila_busqueda_dni, text="Buscar por DNI", command=self.buscar_dni)
-        self.btn_buscar.pack(side="left", padx=(0, 6))
-
-        # --- Fila de busqueda por Apellido ---
-        fila_busqueda_apellido = ttk.Frame(contenedor)
-        fila_busqueda_apellido.pack(fill="x", pady=(0, 8))
-
-        ttk.Label(fila_busqueda_apellido, text="Apellido:").pack(side="left")
-
         validar_texto = (self.root.register(self._validar_entrada_nombre), "%P")
-        self.apellido_var = tk.StringVar()
-        self.apellido_entry = ttk.Entry(
-            fila_busqueda_apellido, textvariable=self.apellido_var, width=20,
-            validate="key", validatecommand=validar_texto,
-        )
-        self.apellido_entry.pack(side="left", padx=(45, 6))
-        self.apellido_entry.bind("<Return>", lambda e: self.buscar_nombre())
-
-        # --- Fila de busqueda por Nombre ---
-        # fila_busqueda_nombre = ttk.Frame(contenedor)
-        # fila_busqueda_nombre.pack(fill="x", pady=(0, 8))
-
-        ttk.Label(fila_busqueda_apellido, text="Nombre:").pack(side="left")
-
-        self.nombre_var = tk.StringVar()
-        self.nombre_entry = ttk.Entry(
-            fila_busqueda_apellido, textvariable=self.nombre_var, width=20,
-            validate="key", validatecommand=validar_texto,
-        )
-        self.nombre_entry.pack(side="left", padx=(6, 6))
-        self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
-
-        self.btn_buscar_nombre = ttk.Button(fila_busqueda_apellido, text="Buscar", command=self.buscar_nombre)
-        self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
-
-        # --- Fila de busqueda por Calle y Altura ---
-        fila_busqueda_domicilio = ttk.Frame(contenedor)
-        fila_busqueda_domicilio.pack(fill="x", pady=(0, 8))
-
         validar_calle = (self.root.register(self._validar_entrada_calle), "%P")
         validar_altura = (self.root.register(self._validar_entrada_altura), "%P")
 
-        # Calle
-        ttk.Label(fila_busqueda_domicilio, text="Calle:").pack(side="left")
+        # Fila 0: DNI
+        ttk.Label(grilla, text="Numero de DNI:").grid(row=0, column=0, **opciones_label)
+        self.dni_var = tk.StringVar()
+        self.dni_entry = ttk.Entry(
+            grilla, textvariable=self.dni_var,
+            validate="key", validatecommand=validar_dni,
+        )
+        self.dni_entry.grid(row=0, column=1, **opciones_entry)
+        self.dni_entry.bind("<Return>", lambda e: self.buscar_dni())
+
+        self.btn_buscar = ttk.Button(grilla, text="Buscar por DNI", command=self.buscar_dni)
+        self.btn_buscar.grid(row=0, column=4, **opciones_boton)
+
+        # Fila 1: Apellido / Nombre
+        ttk.Label(grilla, text="Apellido:").grid(row=1, column=0, **opciones_label)
+        self.apellido_var = tk.StringVar()
+        self.apellido_entry = ttk.Entry(
+            grilla, textvariable=self.apellido_var,
+            validate="key", validatecommand=validar_texto,
+        )
+        self.apellido_entry.grid(row=1, column=1, **opciones_entry)
+        self.apellido_entry.bind("<Return>", lambda e: self.buscar_nombre())
+
+        ttk.Label(grilla, text="Nombre:").grid(row=1, column=2, **opciones_label)
+        self.nombre_var = tk.StringVar()
+        self.nombre_entry = ttk.Entry(
+            grilla, textvariable=self.nombre_var,
+            validate="key", validatecommand=validar_texto,
+        )
+        self.nombre_entry.grid(row=1, column=3, **opciones_entry)
+        self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
+
+        self.btn_buscar_nombre = ttk.Button(grilla, text="Buscar por nombre", command=self.buscar_nombre)
+        self.btn_buscar_nombre.grid(row=1, column=4, **opciones_boton)
+
+        # Fila 2: Calle / Altura
+        ttk.Label(grilla, text="Calle:").grid(row=2, column=0, **opciones_label)
         self.calle_var = tk.StringVar()
         self.calle_entry = ttk.Entry(
-            fila_busqueda_domicilio, textvariable=self.calle_var, width=25,
+            grilla, textvariable=self.calle_var,
             validate="key", validatecommand=validar_calle,
         )
-        self.calle_entry.pack(side="left", padx=(6, 12))
+        self.calle_entry.grid(row=2, column=1, **opciones_entry)
         self.calle_entry.bind("<Return>", lambda e: self.buscar_domicilio())
 
-        # Altura
-        ttk.Label(fila_busqueda_domicilio, text="Altura:").pack(side="left")
+        ttk.Label(grilla, text="Altura:").grid(row=2, column=2, **opciones_label)
         self.altura_var = tk.StringVar()
         self.altura_entry = ttk.Entry(
-            fila_busqueda_domicilio, textvariable=self.altura_var, width=8,
+            grilla, textvariable=self.altura_var,
             validate="key", validatecommand=validar_altura,
         )
-        self.altura_entry.pack(side="left", padx=(6, 12))
+        self.altura_entry.grid(row=2, column=3, **opciones_entry)
         self.altura_entry.bind("<Return>", lambda e: self.buscar_domicilio())
 
-        # Botón buscar (deshabilitado hasta que haya una calle)
+        # Boton deshabilitado hasta que haya una calle
         self.btn_buscar_domicilio = ttk.Button(
-            fila_busqueda_domicilio, text="Buscar por calle y altura",
-            command=self.buscar_domicilio,
+            grilla, text="Buscar por calle y altura", command=self.buscar_domicilio,
         )
-        self.btn_buscar_domicilio.pack(side="left", padx=(0, 6))
+        self.btn_buscar_domicilio.grid(row=2, column=4, **opciones_boton)
         self.btn_buscar_domicilio.state(["disabled"])
         self.calle_var.trace_add("write", self._actualizar_estado_btn_domicilio)
 
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
         self.resultado_text = scrolledtext.ScrolledText(
-            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 10)
+            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 12) # cambiar aca para agrandar/achicar el tamaño de la letra en el textarea
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
         # --- Botones inferiores ---
         self.resultados_guardados = ""
-        fila_busqueda_descargar_resultados = ttk.Frame(contenedor)
-        fila_busqueda_descargar_resultados.pack(fill="x", pady=(8, 0))
+        fila_inferior = ttk.Frame(contenedor)
+        fila_inferior.pack(fill="x", pady=(8, 0))
 
         self.btn_descargar_resultados = ttk.Button(
-            fila_busqueda_descargar_resultados, text="Descargar resultados", command=self.descargar_resultados
+            fila_inferior, text="Descargar resultados", command=self.descargar_resultados
         )
         self.btn_descargar_resultados.pack(side="left")
-        
+
         self.btn_actualizar = ttk.Button(
-            fila_busqueda_descargar_resultados, text="Actualizar bases de datos", command=self.actualizar_bases
+            fila_inferior, text="Actualizar bases de datos", command=self.actualizar_bases
         )
         self.btn_actualizar.pack(side="right")
 
@@ -685,6 +691,7 @@ class BuscadorApp:
 
 def main():
     root = tk.Tk()
+    agrandar_fuentes(root, 12)
     BuscadorApp(root)
     root.mainloop()
 
