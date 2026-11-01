@@ -217,43 +217,61 @@ class BuscadorApp:
             fila_busqueda_apellido, textvariable=self.apellido_var, width=20,
             validate="key", validatecommand=validar_texto,
         )
-        self.apellido_entry.pack(side="left", padx=(6, 6))
+        self.apellido_entry.pack(side="left", padx=(45, 6))
         self.apellido_entry.bind("<Return>", lambda e: self.buscar_nombre())
 
         # --- Fila de busqueda por Nombre ---
-        fila_busqueda_nombre = ttk.Frame(contenedor)
-        fila_busqueda_nombre.pack(fill="x", pady=(0, 8))
+        # fila_busqueda_nombre = ttk.Frame(contenedor)
+        # fila_busqueda_nombre.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda_nombre, text="Nombre:").pack(side="left")
+        ttk.Label(fila_busqueda_apellido, text="Nombre:").pack(side="left")
 
         self.nombre_var = tk.StringVar()
         self.nombre_entry = ttk.Entry(
-            fila_busqueda_nombre, textvariable=self.nombre_var, width=20,
+            fila_busqueda_apellido, textvariable=self.nombre_var, width=20,
             validate="key", validatecommand=validar_texto,
         )
         self.nombre_entry.pack(side="left", padx=(6, 6))
         self.nombre_entry.bind("<Return>", lambda e: self.buscar_nombre())
 
-        self.btn_buscar_nombre = ttk.Button(fila_busqueda_nombre, text="Buscar por apellido y nombre", command=self.buscar_nombre)
+        self.btn_buscar_nombre = ttk.Button(fila_busqueda_apellido, text="Buscar", command=self.buscar_nombre)
         self.btn_buscar_nombre.pack(side="left", padx=(0, 6))
 
         # --- Fila de busqueda por Calle y Altura ---
         fila_busqueda_domicilio = ttk.Frame(contenedor)
         fila_busqueda_domicilio.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(fila_busqueda_domicilio, text="Calle y Altura:").pack(side="left")
+        validar_calle = (self.root.register(self._validar_entrada_calle), "%P")
+        validar_altura = (self.root.register(self._validar_entrada_altura), "%P")
 
-        validar_domicilio = (self.root.register(self._validar_entrada_domicilio), "%P")
-        self.domicilio_var = tk.StringVar()
-        self.domicilio_entry = ttk.Entry(
-            fila_busqueda_domicilio, textvariable=self.domicilio_var, width=20,
-            validate="key", validatecommand=validar_domicilio,
+        # Calle
+        ttk.Label(fila_busqueda_domicilio, text="Calle:").pack(side="left")
+        self.calle_var = tk.StringVar()
+        self.calle_entry = ttk.Entry(
+            fila_busqueda_domicilio, textvariable=self.calle_var, width=25,
+            validate="key", validatecommand=validar_calle,
         )
-        self.domicilio_entry.pack(side="left", padx=(6, 6))
-        self.domicilio_entry.bind("<Return>", lambda e: self.buscar_domicilio())
+        self.calle_entry.pack(side="left", padx=(6, 12))
+        self.calle_entry.bind("<Return>", lambda e: self.buscar_domicilio())
 
-        self.btn_buscar_domicilio = ttk.Button(fila_busqueda_domicilio, text="Buscar por calle y altura", command=self.buscar_domicilio)
+        # Altura
+        ttk.Label(fila_busqueda_domicilio, text="Altura:").pack(side="left")
+        self.altura_var = tk.StringVar()
+        self.altura_entry = ttk.Entry(
+            fila_busqueda_domicilio, textvariable=self.altura_var, width=8,
+            validate="key", validatecommand=validar_altura,
+        )
+        self.altura_entry.pack(side="left", padx=(6, 12))
+        self.altura_entry.bind("<Return>", lambda e: self.buscar_domicilio())
+
+        # Botón buscar (deshabilitado hasta que haya una calle)
+        self.btn_buscar_domicilio = ttk.Button(
+            fila_busqueda_domicilio, text="Buscar por calle y altura",
+            command=self.buscar_domicilio,
+        )
         self.btn_buscar_domicilio.pack(side="left", padx=(0, 6))
+        self.btn_buscar_domicilio.state(["disabled"])
+        self.calle_var.trace_add("write", self._actualizar_estado_btn_domicilio)
 
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
@@ -285,8 +303,36 @@ class BuscadorApp:
     def _validar_entrada_nombre(self, valor_propuesto):
         return valor_propuesto == "" or valor_propuesto.replace(" ", "").isalpha()
     
-    def _validar_entrada_domicilio(self, valor_propuesto):
-        return valor_propuesto == "" or valor_propuesto.replace(" ", "").isalnum()
+    # def _validar_entrada_domicilio(self, valor_propuesto):
+    #     return valor_propuesto == "" or valor_propuesto.replace(" ", "").isalnum()
+
+    def _validar_entrada_calle(self, texto):
+        # Letras (con acentos y ñ), números, espacios y puntos. Máx. 40 caracteres.
+        if texto == "":
+            return True
+        return (
+            len(texto) <= 40
+            and re.fullmatch(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9. ]+", texto) is not None
+        )
+
+    def _validar_entrada_altura(self, texto):
+        # Solo dígitos, entero positivo (sin 0 inicial), máx. 6 dígitos.
+        if texto == "":
+            return True
+        return (
+            texto.isascii()
+            and texto.isdigit()
+            and not texto.startswith("0")
+            and len(texto) <= 6
+        )
+
+    # ---------- Estado del botón ----------
+    def _actualizar_estado_btn_domicilio(self, *args):
+        if self.calle_var.get().strip():
+            self.btn_buscar_domicilio.state(["!disabled"])
+        else:
+            self.btn_buscar_domicilio.state(["disabled"])
+
 
     # ------------------------------------------------------------------
     # Conexion y carga de datos
@@ -334,7 +380,8 @@ class BuscadorApp:
         self.apellido_entry.config(state=estado)
         self.nombre_entry.config(state=estado)
         self.btn_buscar_nombre.config(state=estado)
-        self.domicilio_entry.config(state=estado)
+        self.calle_entry.config(state=estado)
+        self.altura_entry.config(state=estado)
         self.btn_buscar_domicilio.config(state=estado)
         self.btn_descargar_resultados.config(state=estado)
 
@@ -366,6 +413,8 @@ class BuscadorApp:
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
+
+        self.limpiar_campos("dni")
 
         dni_buscar = self.dni_var.get().strip()
         if not dni_buscar or not dni_buscar.isdigit():
@@ -417,11 +466,14 @@ class BuscadorApp:
             self._escribir_resultado(
                 f"El DNI ingresado {dni_buscar} no se encontro en las bases de datos."
             )
-        
+
+    # TODO: Dividir en 2 funciones buscar nombre y buscar apellido.  
     def buscar_nombre(self):
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
+
+        self.limpiar_campos("nombre")
 
         apellido_buscar = self.apellido_var.get().strip().lower()
         nombre_buscar = self.nombre_var.get().strip().lower()
@@ -486,19 +538,33 @@ class BuscadorApp:
             self._escribir_resultado(
                 f"El registro '{busqueda_str}' no se encontro en las bases de datos."
             )     
+    
+    def limpiar_campos(self, evitar):
+        """
+        Limpia todos los campos, evita el campo ingresado por parametro.
+        Valores: "dni", "nombre", "domicilio"
+        """
+        if (not evitar == "dni"):
+            self.dni_var.set("")
+        if (not evitar == "nombre"):
+            self.apellido_var.set("")
+            self.nombre_var.set("")
+        if (not evitar == "domicilio"):
+            self.calle_var.set("")
+            self.altura_var.set("")
 
     def buscar_domicilio(self):
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
 
-        domicilio_buscar = self.domicilio_var.get().strip().lower()
-        if not domicilio_buscar:
-            messagebox.showwarning("Domicilio invalido", "Debe ingresar calle y altura (ej: Cnel. Pedro Aquino 2356).")
-            return
+        self.limpiar_campos("domicilio")
+        
+        calle_buscar = self.calle_var.get().strip().lower()
+        altura_buscar = self.altura_var.get().strip().lower()
 
-        if len(domicilio_buscar.split()) < 2:
-            messagebox.showwarning("Entrada invalida", "Debe ingresar minimo 2 palabras (ej: Cnel. Pedro Aquino 2356).")
+        if not calle_buscar:
+            messagebox.showwarning("Domicilio invalido", "Debe ingresar calle siempre (ej: Cnel. Pedro Aquino).")
             return
 
         self._escribir_resultado("", limpiar=True)
@@ -523,27 +589,50 @@ class BuscadorApp:
                 if not dato[col_calle].replace(" ", "").isalnum() or not dato[col_altura].split()[0].isdigit():
                     continue
 
-                valor = f"{dato[col_calle].lower()} {dato[col_altura]}"
+                calle = dato[col_calle].lower()
+                altura = dato[col_altura]
+                def hay_coincidencia(entrada, texto):
+                    return re.search(re.escape(entrada.strip()), texto, re.IGNORECASE) is not None
 
-                if valor == domicilio_buscar:
-                    encontrado = True
-                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                    coincidencias.append(campos_guardar)
-                    contador += 1
+                if hay_coincidencia(calle_buscar, calle):
+                    if (altura_buscar and altura == altura_buscar):
+                        encontrado = True
+                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                        coincidencias.append(campos_guardar)
+                        contador += 1
+    
+                        dato_formateado = list(dato)
+                        dato_formateado[1] = dato_formateado[1].capitalize()
+                        dato_formateado[2] = dato_formateado[2].capitalize()
+    
+                        try:
+                            mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
+                        except IndexError:
+                            mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
+    
+                        if contador == 1:
+                            primer_mensaje = mensaje_item
+                        else:
+                            primer_mensaje += f"\n{mensaje_item}"
+                    elif (not altura_buscar):
+                        encontrado = True
+                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
+                        coincidencias.append(campos_guardar)
+                        contador += 1
 
-                    dato_formateado = list(dato)
-                    dato_formateado[1] = dato_formateado[1].capitalize()
-                    dato_formateado[2] = dato_formateado[2].capitalize()
+                        dato_formateado = list(dato)
+                        dato_formateado[1] = dato_formateado[1].capitalize()
+                        dato_formateado[2] = dato_formateado[2].capitalize()
 
-                    try:
-                        mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
-                    except IndexError:
-                        mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
+                        try:
+                            mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
+                        except IndexError:
+                            mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
 
-                    if contador == 1:
-                        primer_mensaje = mensaje_item
-                    else:
-                        primer_mensaje += f"\n{mensaje_item}"
+                        if contador == 1:
+                            primer_mensaje = mensaje_item
+                        else:
+                            primer_mensaje += f"\n{mensaje_item}"
 
             if contador > 0:
                 self._escribir_resultado(primer_mensaje)
@@ -552,7 +641,7 @@ class BuscadorApp:
 
         if not encontrado:
             self._escribir_resultado(
-                f"El Domicilio ingresado '{domicilio_buscar.capitalize()}' no se encontro en las bases de datos."
+                f"El Domicilio ingresado '{calle_buscar.capitalize()}{" " + altura_buscar.capitalize() if altura_buscar else ""}' no se encontro en las bases de datos."
             )    
 
     # ------------------------------------------------------------------
