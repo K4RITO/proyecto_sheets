@@ -194,7 +194,7 @@ class BuscadorApp:
     def _armar_interfaz(self):
         # 1. Establecer el icono de la ventana (.ico)
         try:
-            self.root.iconbitmap("img/logo.ico")
+            self.root.iconbitmap("logo.ico")
         except Exception as e:
             print(f"No se pudo cargar logo.ico: {e}")
 
@@ -207,7 +207,7 @@ class BuscadorApp:
 
         # 2. Cargar e insertar el logo PNG en el diseño
         try:
-            img_logo = Image.open("img/logo.png.png")
+            img_logo = Image.open("logo.png.png")
             # Ajusta (ancho, alto) según lo que necesites para tu interfaz
             img_logo = img_logo.resize((80, 80), Image.Resampling.LANCZOS)
             self.logo_tk = ImageTk.PhotoImage(img_logo)
@@ -216,7 +216,11 @@ class BuscadorApp:
             lbl_logo.pack(side="left", padx=(0, 10))
         except Exception as e:
             print(f"No se pudo cargar el logo.png: {e}")
+        # Para el icono de la ventana:
+        self.root.iconbitmap("logo.ico")
 
+        # Para el logo de la interfaz:
+        img_logo = Image.open("logo.png")
         # --- Estado de conexión ---
         self.estado_var = tk.StringVar(value="Conectando a Google Sheets...")
         estado_label = ttk.Label(header_frame, textvariable=self.estado_var, foreground="gray")
