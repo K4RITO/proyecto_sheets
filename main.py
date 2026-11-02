@@ -10,7 +10,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import tkinter.font as tkfont
-
+from PIL import Image, ImageTk
 import re
 import csv
 import os
@@ -192,13 +192,35 @@ class BuscadorApp:
     # ------------------------------------------------------------------
 
     def _armar_interfaz(self):
+        # 1. Establecer el icono de la ventana (.ico)
+        try:
+            self.root.iconbitmap("img/logo.ico")
+        except Exception as e:
+            print(f"No se pudo cargar logo.ico: {e}")
+
         contenedor = ttk.Frame(self.root, padding=12)
         contenedor.pack(fill="both", expand=True)
 
-        # --- Fila de estado de conexion ---
+        # --- Encabezado: Logo PNG + Estado de conexión ---
+        header_frame = ttk.Frame(contenedor)
+        header_frame.pack(fill="x", pady=(0, 8))
+
+        # 2. Cargar e insertar el logo PNG en el diseño
+        try:
+            img_logo = Image.open("img/logo.png.png")
+            # Ajusta (ancho, alto) según lo que necesites para tu interfaz
+            img_logo = img_logo.resize((80, 80), Image.Resampling.LANCZOS)
+            self.logo_tk = ImageTk.PhotoImage(img_logo)
+
+            lbl_logo = ttk.Label(header_frame, image=self.logo_tk)
+            lbl_logo.pack(side="left", padx=(0, 10))
+        except Exception as e:
+            print(f"No se pudo cargar el logo.png: {e}")
+
+        # --- Estado de conexión ---
         self.estado_var = tk.StringVar(value="Conectando a Google Sheets...")
-        estado_label = ttk.Label(contenedor, textvariable=self.estado_var, foreground="gray")
-        estado_label.pack(anchor="w", pady=(0, 8))
+        estado_label = ttk.Label(header_frame, textvariable=self.estado_var, foreground="gray")
+        estado_label.pack(side="left", anchor="w")
 
         # --- Grilla de busqueda: (label, entry, label2, entry2, button) ---
         grilla = ttk.Frame(contenedor)
@@ -282,7 +304,7 @@ class BuscadorApp:
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
         self.resultado_text = scrolledtext.ScrolledText(
-            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 12) # cambiar aca para agrandar/achicar el tamaño de la letra en el textarea
+            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 12)
         )
         self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
 
@@ -646,9 +668,7 @@ class BuscadorApp:
         self.guardar_resultados(coincidencias)
 
         if not encontrado:
-            self._escribir_resultado(
-                f"El Domicilio ingresado '{calle_buscar.capitalize()}{" " + altura_buscar.capitalize() if altura_buscar else ""}' no se encontro en las bases de datos."
-            )    
+            self._escribir_resultado(f"El Domicilio ingresado '{calle_buscar.capitalize()}{' ' + altura_buscar.capitalize() if altura_buscar else ''}' no se encontro en las bases de datos.")    
 
     # ------------------------------------------------------------------
     # Funciones de los resultados
