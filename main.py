@@ -15,12 +15,16 @@ import re
 import csv
 import os
 from datetime import datetime
+import ast
+import glob
+import shutil
+from pathlib import Path
 
 import gspread
 
 # Configuracion de conexion
-CREDENTIALS_FILE = "proyecto-sheets-505320-bb8ae069f096.json"
-SHEET_NAME = "Tablas IMDEL Prototipo 2"
+CREDENTIALS_FILE = "Credenciales.json"
+SHEET_NAME = "Tablas IMDEL"
 
 def _limpiar_recorte(valor, min_len):
     """Extrae los digitos de un valor y descarta los primeros 2 y el
@@ -33,12 +37,19 @@ def _limpiar_recorte(valor, min_len):
         return "".join(digitos)
     return valor
 
-
 def _limpiar_solo_digitos(valor, min_len):
     """Extrae solo los digitos de un valor. Usado en usuarios."""
     if len(valor) >= min_len:
         return "".join(c for c in valor if c.isdigit())
     return valor
+
+def vaciar_carpeta(ruta):
+    carpeta = Path(ruta)
+    for item in carpeta.iterdir():
+        if item.is_dir() and not item.is_symlink():
+            shutil.rmtree(item)   # borra subcarpetas con todo su contenido
+        else:
+            item.unlink()  
 
 SHEETS_CONFIG = [
     {
@@ -157,6 +168,8 @@ SHEETS_CONFIG = [
     }, 
 ]
 
+BACKUP_DIR = r"C:\Reportes IMDEL\backup"
+
 def agrandar_fuentes(root, tamano=12):
     # Fuentes por defecto de Tk: todos los widgets las usan
     for nombre in ("TkDefaultFont", "TkTextFont", "TkMenuFont",
@@ -181,6 +194,7 @@ class BuscadorApp:
         self.worksheets = {}   # nombre_interno -> objeto worksheet
         self.registros = {}    # nombre_interno -> lista de filas (get_all_values)
         self.conectado = False
+        self.modo_offline = False
 
         self._armar_interfaz()
 
@@ -375,24 +389,31 @@ class BuscadorApp:
         hilo.start()
 
     def _conectar(self):
-
-        self.guardar_backup()
-
         try:
             self.gc = gspread.service_account(filename=CREDENTIALS_FILE)
             self.proyecto_sheets = self.gc.open(SHEET_NAME)
-
             for hoja in SHEETS_CONFIG:
                 ws = self.proyecto_sheets.get_worksheet(hoja["worksheet_index"])
                 self.worksheets[hoja["nombre_interno"]] = ws
 
             self._cargar_datos()
+            # raise Exception("Prueba") 
+            self.guardar_backup(self.registros)
             self.conectado = True
-            self.root.after(0, lambda: self.estado_var.set(
-                "Conectado. Bases de datos cargadas."
-            ))
+            self.modo_offline = False
+            self.root.after(0, lambda: self.estado_var.set("Conectado. Bases de datos cargadas."))
         except Exception as e:
-            self.root.after(0, lambda: self._mostrar_error_conexion(e))
+            try:
+                archivo = self._cargar_backup()
+            except Exception:
+                archivo = None
+            if archivo:
+                self.conectado = True
+                self.modo_offline = True
+                self.root.after(0, lambda: self.estado_var.set(
+                    f"SIN CONEXIÓN. Usando backup: {archivo}"))
+            else:
+                self.root.after(0, lambda err=e: self._mostrar_error_conexion(err))
         finally:
             self.root.after(0, lambda: self._set_controles_habilitados(True))
 
@@ -422,33 +443,61 @@ class BuscadorApp:
 
     # GUARDAR BACKUPS
 
-    def guardar_backup(self):
-        self._cargar_datos()
-        carpeta_backup = r"C:\Reportes IMDEL\backup"
-        if not os.path.exists(carpeta_backup):
-            os.makedirs(carpeta_backup)
-        fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-       
-        nombre_archivo = f"backup - {fecha}hs.csv"
+    def guardar_backup(self, datos):
+        if not os.path.exists(BACKUP_DIR):
+            os.makedirs(BACKUP_DIR)
+        else:
+            vaciar_carpeta(BACKUP_DIR)
 
-        ruta_archivo = os.path.join(carpeta_backup, nombre_archivo)
+        fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")       
+        nombre_archivo = f"backup - {fecha}hs.csv"
+        ruta_archivo = os.path.join(BACKUP_DIR, nombre_archivo)
+
+        nombres_internos = []
+        for nombre_interno, _ in self.worksheets.items():
+            nombres_internos.append(nombre_interno)
+
         with open(ruta_archivo, "w", newline="", encoding="utf-8") as archivo:
             escritor = csv.writer(archivo)
 
-            for registro in self.registros:
-                escritor.writerow(registro)
+            for i in range(len(nombres_internos)):
+                escritor.writerow(datos[nombres_internos[i]])
 
         messagebox.showinfo(
             "Descarga completada",
             f"El archivo se guardó correctamente en:\n{ruta_archivo}"
         )
+    
+    def _cargar_backup(self):
+        """Carga el backup más reciente. Devuelve el nombre del archivo o None."""
+        archivos = glob.glob(os.path.join(BACKUP_DIR, "backup - *.csv"))
+
+        if not archivos:
+            return None
+        
+        ultimo = max(archivos, key=os.path.getmtime)
+
+        with open(ultimo, newline="", encoding="utf-8") as f:
+            filas = list(csv.reader(f))
+            
+        # Cada fila del CSV = una hoja; cada celda = str() de una fila de la hoja
+        for hoja, fila in zip(SHEETS_CONFIG, filas):
+            self.registros[hoja["nombre_interno"]] = [ast.literal_eval(c) for c in fila]
+
+        return os.path.basename(ultimo)
     # ------------------------------------------------------------------
     # Boton: actualizar bases
     # ------------------------------------------------------------------
     def actualizar_bases(self):
+        if self.modo_offline:
+            self.estado_var.set("Reintentando conexión...")
+            self._conectar_en_hilo()
+            return
+        
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
+        
         self.estado_var.set("Actualizando bases de datos...")
         self._set_controles_habilitados(False)
         hilo = threading.Thread(target=self._actualizar_bases_hilo, daemon=True)
