@@ -215,12 +215,12 @@ class BuscadorApp:
             lbl_logo = ttk.Label(header_frame, image=self.logo_tk)
             lbl_logo.pack(side="left", padx=(0, 10))
         except Exception as e:
-            print(f"No se pudo cargar el logo.png: {e}")
+            print(f"No se pudo cargar el logo.png.png: {e}")
         # Para el icono de la ventana:
         self.root.iconbitmap("logo.ico")
 
         # Para el logo de la interfaz:
-        img_logo = Image.open("logo.png")
+        img_logo = Image.open("logo.png.png")
         # --- Estado de conexión ---
         self.estado_var = tk.StringVar(value="Conectando a Google Sheets...")
         estado_label = ttk.Label(header_frame, textvariable=self.estado_var, foreground="gray")
@@ -375,6 +375,9 @@ class BuscadorApp:
         hilo.start()
 
     def _conectar(self):
+
+        self.guardar_backup()
+
         try:
             self.gc = gspread.service_account(filename=CREDENTIALS_FILE)
             self.proyecto_sheets = self.gc.open(SHEET_NAME)
@@ -417,6 +420,28 @@ class BuscadorApp:
         self.btn_buscar_domicilio.config(state=estado)
         self.btn_descargar_resultados.config(state=estado)
 
+    # GUARDAR BACKUPS
+
+    def guardar_backup(self):
+        self._cargar_datos()
+        carpeta_backup = r"C:\Reportes IMDEL\backup"
+        if not os.path.exists(carpeta_backup):
+            os.makedirs(carpeta_backup)
+        fecha = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+       
+        nombre_archivo = f"backup - {fecha}hs.csv"
+
+        ruta_archivo = os.path.join(carpeta_backup, nombre_archivo)
+        with open(ruta_archivo, "w", newline="", encoding="utf-8") as archivo:
+            escritor = csv.writer(archivo)
+
+            for registro in self.registros:
+                escritor.writerow(registro)
+
+        messagebox.showinfo(
+            "Descarga completada",
+            f"El archivo se guardó correctamente en:\n{ruta_archivo}"
+        )
     # ------------------------------------------------------------------
     # Boton: actualizar bases
     # ------------------------------------------------------------------
