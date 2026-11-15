@@ -37,12 +37,6 @@ def _limpiar_recorte(valor, min_len):
         return "".join(digitos)
     return valor
 
-def _limpiar_solo_digitos(valor, min_len):
-    """Extrae solo los digitos de un valor. Usado en usuarios."""
-    if len(valor) >= min_len:
-        return "".join(c for c in valor if c.isdigit())
-    return valor
-
 def vaciar_carpeta(ruta):
     carpeta = Path(ruta)
     for item in carpeta.iterdir():
@@ -196,9 +190,18 @@ class BuscadorApp:
         self.conectado = False
         self.modo_offline = False
 
+        # Variables del menu
+        self.tamano_var = tk.IntVar(value=12)
+        self.tema_oscuro = tk.BooleanVar(value=False)
+        self.tema_original = ttk.Style(root).theme_use()
+
+        # Arma la interfaz general
         self._armar_interfaz()
 
-        # Conectar en segundo plano al iniciar para no congelar la UI
+        # Construye el menu
+        self._armar_menu()
+
+        # Conecta en otro hilo al iniciar para no congelar la UI
         self._conectar_en_hilo()
 
     # ------------------------------------------------------------------
@@ -340,6 +343,63 @@ class BuscadorApp:
             fila_inferior, text="Actualizar bases de datos", command=self.actualizar_bases
         )
         self.btn_actualizar.pack(side="right")
+
+    # -----
+    # Menus
+    # -----
+
+    def _armar_menu(self):
+        barra = tk.Menu(self.root)
+        self.root.config(menu=barra)
+
+        # Archivo
+        m_archivo = tk.Menu(barra, tearoff=0)
+        m_archivo.add_command(label="Descargar resultados", command=self.descargar_resultados)
+        m_archivo.add_command(label="Actualizar bases de datos", command=self.actualizar_bases)
+        m_archivo.add_separator()
+        m_archivo.add_command(label="Salir", command=self.root.destroy)
+        barra.add_cascade(label="Archivo", menu=m_archivo)
+
+        # Ver
+        m_ver = tk.Menu(barra, tearoff=0)
+        m_fuente = tk.Menu(m_ver, tearoff=0)
+        for t in (10, 12, 14, 16, 18):
+            m_fuente.add_radiobutton(
+                label=f"{t} pt", variable=self.tamano_var, value=t,
+                command=lambda: self.cambiar_fuente(self.tamano_var.get()),
+            )
+        m_ver.add_cascade(label="Tamaño de letra", menu=m_fuente)
+        m_ver.add_checkbutton(label="Modo oscuro", variable=self.tema_oscuro,
+                              command=self.aplicar_tema)
+        barra.add_cascade(label="Ver", menu=m_ver)
+
+        # Ayuda (para futuras opciones)
+        m_ayuda = tk.Menu(barra, tearoff=0)
+        m_ayuda.add_command(
+            label="Acerca de",
+            command=lambda: messagebox.showinfo("Acerca de", "Buscador de beneficiarios - IMDEL"),
+        )
+        barra.add_cascade(label="Ayuda", menu=m_ayuda)
+
+    def cambiar_fuente(self, tamano):
+        agrandar_fuentes(self.root, tamano)
+        self.resultado_text.config(font=("Consolas", tamano))
+
+    def aplicar_tema(self):
+        estilo = ttk.Style(self.root)
+        if self.tema_oscuro.get():
+            bg, fg, campo = "#2b2b2b", "#e6e6e6", "#3c3f41"
+            estilo.theme_use("clam")
+            estilo.configure(".", background=bg, foreground=fg)
+            estilo.configure("TEntry", fieldbackground=campo, foreground=fg)
+            estilo.map(".", foreground=[("disabled", "#888888")])
+            estilo.map("TButton", background=[("active", "#4a4d50")])
+        else:
+            bg, fg, campo = "#f0f0f0", "black", "white"
+            estilo.theme_use(self.tema_original)
+
+        self.root.configure(bg=bg)
+        self.resultado_text.config(bg=campo, fg=fg, insertbackground=fg)
 
     # --- Validaciones ---
 
