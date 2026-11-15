@@ -161,7 +161,8 @@ SHEETS_CONFIG = [
         ),
     }, 
 ]
-
+COLUMNAS = ("DNI", "Nombre", "Apellido", "Calle", "Altura",
+            "Teléfono", "Email", "Coordinación", "Programa") # Columnas de la tabla de resultados
 BACKUP_DIR = r"C:\Reportes IMDEL\backup"
 
 def agrandar_fuentes(root, tamano=12):
@@ -183,17 +184,18 @@ class BuscadorApp:
         self.root.resizable(True, True)
 
         # Estado interno
-        self.gc = None
-        self.proyecto_sheets = None
+        self.gc = None # Conexion con Google Cloud a traves de GSpread
+        self.proyecto_sheets = None 
         self.worksheets = {}   # nombre_interno -> objeto worksheet
         self.registros = {}    # nombre_interno -> lista de filas (get_all_values)
         self.conectado = False
         self.modo_offline = False
 
         # Variables del menu
-        self.tamano_var = tk.IntVar(value=12)
-        self.tema_oscuro = tk.BooleanVar(value=False)
-        self.tema_original = ttk.Style(root).theme_use()
+        self.tamano_var = tk.IntVar(value=12) # Tamaño de la fuente, por defecto 12pt
+        self.tema_oscuro = tk.BooleanVar(value=False) # Variable que determina si tema es oscuro
+        self.tema_original = ttk.Style(root).theme_use() # Variable que guarda el tema de la aplicacion por defecto.
+        self.vista_var = tk.StringVar(value="texto")  # Determina si los resultados aparecen como "Texto" o "Tabla"
 
         # Arma la interfaz general
         self._armar_interfaz()
@@ -324,11 +326,36 @@ class BuscadorApp:
 
         # --- Area de resultados ---
         ttk.Label(contenedor, text="Resultados:").pack(anchor="w")
-        self.resultado_text = scrolledtext.ScrolledText(
-            contenedor, wrap="word", height=20, state="disabled", font=("Consolas", 12)
-        )
-        self.resultado_text.pack(fill="both", expand=True, pady=(4, 0))
+        self.marco_resultados = ttk.Frame(contenedor)
+        self.marco_resultados.pack(fill="both", expand=True, pady=(4, 0))
 
+        # Vista texto
+        self.marco_texto = ttk.Frame(self.marco_resultados)
+        self.resultado_text = scrolledtext.ScrolledText(
+            self.marco_texto, wrap="word", height=20, state="disabled",
+            font=("Consolas", self.tamano_var.get()),
+        )
+        self.resultado_text.pack(fill="both", expand=True)
+
+        # Vista tabla
+        self.marco_tabla = ttk.Frame(self.marco_resultados)
+        self.tabla = ttk.Treeview(self.marco_tabla, columns=COLUMNAS, show="headings")
+        for col, ancho in zip(COLUMNAS, (90, 100, 100, 140, 60, 110, 160, 170, 230)):
+            self.tabla.heading(col, text=col)
+            self.tabla.column(col, width=ancho, minwidth=50, stretch=False)
+        sy = ttk.Scrollbar(self.marco_tabla, orient="vertical", command=self.tabla.yview)
+        sx = ttk.Scrollbar(self.marco_tabla, orient="horizontal", command=self.tabla.xview)
+        self.tabla.configure(yscrollcommand=sy.set, xscrollcommand=sx.set)
+        self.tabla.grid(row=0, column=0, sticky="nsew")
+        sy.grid(row=0, column=1, sticky="ns")
+        sx.grid(row=1, column=0, sticky="ew")
+        self.marco_tabla.rowconfigure(0, weight=1)
+        self.marco_tabla.columnconfigure(0, weight=1)
+
+        self.msg_var = tk.StringVar()
+        ttk.Label(contenedor, textvariable=self.msg_var).pack(anchor="w", pady=(4, 0))
+
+        self.cambiar_vista()
         # --- Botones inferiores ---
         self.resultados_guardados = ""
         fila_inferior = ttk.Frame(contenedor)
@@ -352,7 +379,7 @@ class BuscadorApp:
         barra = tk.Menu(self.root)
         self.root.config(menu=barra)
 
-        # Archivo
+        # Sub menu de Archivo
         m_archivo = tk.Menu(barra, tearoff=0)
         m_archivo.add_command(label="Descargar resultados", command=self.descargar_resultados)
         m_archivo.add_command(label="Actualizar bases de datos", command=self.actualizar_bases)
@@ -371,6 +398,14 @@ class BuscadorApp:
         m_ver.add_cascade(label="Tamaño de letra", menu=m_fuente)
         m_ver.add_checkbutton(label="Modo oscuro", variable=self.tema_oscuro,
                               command=self.aplicar_tema)
+        
+        # Para configurar los resultados como Texto o Tabla
+        m_vista = tk.Menu(m_ver, tearoff=0)
+        m_vista.add_radiobutton(label="Texto", variable=self.vista_var,
+                                value="texto", command=self.cambiar_vista)
+        m_vista.add_radiobutton(label="Tabla", variable=self.vista_var,
+                                value="tabla", command=self.cambiar_vista)
+        m_ver.add_cascade(label="Vista de resultados", menu=m_vista)
         barra.add_cascade(label="Ver", menu=m_ver)
 
         # Ayuda (para futuras opciones)
@@ -380,6 +415,44 @@ class BuscadorApp:
             command=lambda: messagebox.showinfo("Acerca de", "Buscador de beneficiarios - IMDEL"),
         )
         barra.add_cascade(label="Ayuda", menu=m_ayuda)
+
+    def cambiar_vista(self):
+        self.marco_texto.pack_forget()
+        self.marco_tabla.pack_forget()
+        if self.vista_var.get() == "tabla":
+            self.marco_tabla.pack(fill="both", expand=True)
+        else:
+            self.marco_texto.pack(fill="both", expand=True)
+
+    def _escribir_resultado(self, texto, limpiar=False):
+        if limpiar:
+            self.tabla.delete(*self.tabla.get_children())
+            self.resultado_text.config(state="normal")
+            self.resultado_text.delete("1.0", "end")
+            self.resultado_text.config(state="disabled")
+            self.msg_var.set("")
+        else:
+            self.msg_var.set(texto)
+
+    def _buscar(self, coincide, no_encontrado):
+        self._escribir_resultado("", limpiar=True)
+        filas = []
+        self.resultado_text.config(state="normal")
+        for hoja in SHEETS_CONFIG:
+            for dato in self.registros.get(hoja["nombre_interno"], []):
+                if len(dato) < 7 or not coincide(hoja, dato):
+                    continue
+                fila = [*dato[:7], hoja["Coordinacion"], hoja["Programa"]]
+                filas.append(fila)
+                self.tabla.insert("", "end", values=fila)
+
+                d = list(dato)
+                d[1], d[2] = d[1].capitalize(), d[2].capitalize()
+                self.resultado_text.insert(
+                    "end", f"DNI: {d[0]}\n{hoja['formatear'](d)}\n{'-' * 40}\n")
+        self.resultado_text.config(state="disabled")
+        self.guardar_resultados(filas)
+        self._escribir_resultado(f"{len(filas)} resultado(s)." if filas else no_encontrado)
 
     def cambiar_fuente(self, tamano):
         agrandar_fuentes(self.root, tamano)
@@ -392,15 +465,17 @@ class BuscadorApp:
             estilo.theme_use("clam")
             estilo.configure(".", background=bg, foreground=fg)
             estilo.configure("TEntry", fieldbackground=campo, foreground=fg)
+            estilo.configure("Treeview", background=campo, fieldbackground=campo, foreground=fg)
+            estilo.configure("Treeview.Heading", background="#4a4d50", foreground=fg)
+            estilo.map("Treeview", background=[("selected", "#2f65ca")])
             estilo.map(".", foreground=[("disabled", "#888888")])
             estilo.map("TButton", background=[("active", "#4a4d50")])
         else:
             bg, fg, campo = "#f0f0f0", "black", "white"
             estilo.theme_use(self.tema_original)
-
         self.root.configure(bg=bg)
         self.resultado_text.config(bg=campo, fg=fg, insertbackground=fg)
-
+        agrandar_fuentes(self.root, self.tamano_var.get())
     # --- Validaciones ---
 
     def _validar_entrada_dni(self, valor_propuesto):
@@ -575,135 +650,65 @@ class BuscadorApp:
     # ------------------------------------------------------------------
     # Botones de busqueda
     # ------------------------------------------------------------------
+    
     def buscar_dni(self):
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
-
         self.limpiar_campos("dni")
-
-        dni_buscar = self.dni_var.get().strip()
-        if not dni_buscar or not dni_buscar.isdigit():
+        dni = self.dni_var.get().strip()
+        if not dni or not dni.isdigit():
             messagebox.showwarning("DNI invalido", "Ingrese solo numeros (ej: 12345678).")
             return
 
-        self._escribir_resultado("", limpiar=True)
-        encontrado = False
+        def coincide(hoja, dato):
+            valor = hoja["limpiar"](dato[0], hoja["min_len"])
+            dato[0] = valor
+            return valor == dni
 
-        for hoja in SHEETS_CONFIG:
-            col_dni = hoja["col_dni"]
-            nombre_interno = hoja["nombre_interno"]
-            limpiar_fn = hoja.get("limpiar")
-            min_len = hoja.get("min_len")
-            datos_hoja = self.registros.get(nombre_interno, [])
-            contador = 0
-            primer_mensaje = None
+        self._buscar(coincide, f"El DNI ingresado {dni} no se encontro en las bases de datos.")
 
-            for dato in datos_hoja:
-                if len(dato) <= col_dni:
-                    continue
-
-                valor = dato[col_dni]
-                if limpiar_fn is not None:
-                    valor = limpiar_fn(valor, min_len)
-                    dato[col_dni] = valor
-
-                if valor == dni_buscar:
-                    encontrado = True
-                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                    self.guardar_resultados([campos_guardar])
-                    contador += 1
-                    if contador == 1:
-                        try:
-                            primer_mensaje = hoja["formatear"](dato)
-                        except IndexError:
-                            primer_mensaje = (
-                                f"(Fila encontrada en {nombre_interno} pero con "
-                                f"columnas insuficientes para mostrar el detalle)"
-                            )
-
-            if contador > 0:
-                self._escribir_resultado(primer_mensaje)
-                if contador > 1:
-                    self._escribir_resultado(f"Se encontro al beneficiario {contador} veces")
-                self._escribir_resultado("-" * 40)
-
-        if not encontrado:
-            self._escribir_resultado(
-                f"El DNI ingresado {dni_buscar} no se encontro en las bases de datos."
-            )
-
-    # TODO: Dividir en 2 funciones buscar nombre y buscar apellido.  
     def buscar_nombre(self):
         if not self.conectado:
             messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
             return
-
         self.limpiar_campos("nombre")
-
-        apellido_buscar = self.apellido_var.get().strip().lower()
-        nombre_buscar = self.nombre_var.get().strip().lower()
-
-        if not apellido_buscar and not nombre_buscar:
+        apellido = self.apellido_var.get().strip().lower()
+        nombre = self.nombre_var.get().strip().lower()
+        if not apellido and not nombre:
             messagebox.showwarning("Entrada invalida", "Debe ingresar al menos un apellido o un nombre.")
             return
 
-        self._escribir_resultado("", limpiar=True)
-        encontrado = False
-        coincidencias = []
+        def coincide(hoja, dato):
+            n, a = dato[1].strip().lower(), dato[2].strip().lower()
+            return bool(n and a) and nombre in n and apellido in a
 
-        for hoja in SHEETS_CONFIG:
-            col_nombre = 1
-            col_apellido = 2
-            nombre_interno = hoja["nombre_interno"]
-            datos_hoja = self.registros.get(nombre_interno, [])
-            contador = 0
-            primer_mensaje = ""
+        busqueda = f"{apellido} {nombre}".strip()
+        self._buscar(coincide, f"El registro '{busqueda}' no se encontro en las bases de datos.")
 
-            for dato in datos_hoja:
-                if len(dato) <= max(col_nombre, col_apellido):
-                    continue
+    def buscar_domicilio(self):
+        if not self.conectado:
+            messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
+            return
+        self.limpiar_campos("domicilio")
+        calle_buscar = self.calle_var.get().strip().lower()
+        altura_buscar = self.altura_var.get().strip()
+        if not calle_buscar:
+            messagebox.showwarning("Domicilio invalido", "Debe ingresar calle siempre (ej: Cnel. Pedro Aquino).")
+            return
 
-                if not dato[col_apellido].strip() or not dato[col_nombre].strip():
-                    continue
+        def coincide(hoja, dato):
+            calle, altura = dato[3], dato[4]
+            if not calle or not altura.split():
+                return False
+            if not calle.replace(" ", "").isalnum() or not altura.split()[0].isdigit():
+                return False
+            if calle_buscar not in calle.lower():
+                return False
+            return not altura_buscar or altura == altura_buscar
 
-                apellido_cell = dato[col_apellido].strip().lower()
-                nombre_cell = dato[col_nombre].strip().lower()
-
-                # Condicion de coincidencia segun los campos llenos
-                coincide_apellido = apellido_buscar in apellido_cell if apellido_buscar else True
-                coincide_nombre = nombre_buscar in nombre_cell if nombre_buscar else True
-
-                if coincide_apellido and coincide_nombre:
-                    encontrado = True
-                    campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                    coincidencias.append(campos_guardar)
-                    contador += 1
-
-                    dato_formateado = list(dato)
-                    dato_formateado[1] = dato_formateado[1].capitalize()
-                    dato_formateado[2] = dato_formateado[2].capitalize()
-
-                    try:
-                        mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-'* 40}"
-                    except IndexError:
-                        mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
-
-                    if contador == 1:
-                        primer_mensaje = mensaje_item
-                    else:
-                        primer_mensaje += f"\n{mensaje_item}"
-
-            if contador > 0:
-                self._escribir_resultado(primer_mensaje)
-
-        self.guardar_resultados(coincidencias)
-        
-        if not encontrado:
-            busqueda_str = f"{self.apellido_var.get().strip()} {self.nombre_var.get().strip()}".strip()
-            self._escribir_resultado(
-                f"El registro '{busqueda_str}' no se encontro en las bases de datos."
-            )     
+        domicilio = f"{calle_buscar.capitalize()} {altura_buscar}".strip()
+        self._buscar(coincide, f"El Domicilio '{domicilio}' no se encontro en las bases de datos.")    
     
     def limpiar_campos(self, evitar):
         """
@@ -718,95 +723,6 @@ class BuscadorApp:
         if (not evitar == "domicilio"):
             self.calle_var.set("")
             self.altura_var.set("")
-
-    def buscar_domicilio(self):
-        if not self.conectado:
-            messagebox.showwarning("Sin conexion", "Todavia no se completo la conexion inicial.")
-            return
-
-        self.limpiar_campos("domicilio")
-        
-        calle_buscar = self.calle_var.get().strip().lower()
-        altura_buscar = self.altura_var.get().strip().lower()
-
-        if not calle_buscar:
-            messagebox.showwarning("Domicilio invalido", "Debe ingresar calle siempre (ej: Cnel. Pedro Aquino).")
-            return
-
-        self._escribir_resultado("", limpiar=True)
-        encontrado = False
-        coincidencias = []
-
-        for hoja in SHEETS_CONFIG:
-            col_calle = 3
-            col_altura = 4
-            nombre_interno = hoja["nombre_interno"]
-            datos_hoja = self.registros.get(nombre_interno, [])
-            primer_mensaje = ""
-            contador = 0
-
-            for dato in datos_hoja:
-                if len(dato) <= col_calle:
-                    continue
-
-                if not dato[col_calle] or not dato[col_altura]:
-                    continue
-
-                if not dato[col_calle].replace(" ", "").isalnum() or not dato[col_altura].split()[0].isdigit():
-                    continue
-
-                calle = dato[col_calle].lower()
-                altura = dato[col_altura]
-                def hay_coincidencia(entrada, texto):
-                    return re.search(re.escape(entrada.strip()), texto, re.IGNORECASE) is not None
-
-                if hay_coincidencia(calle_buscar, calle):
-                    if (altura_buscar and altura == altura_buscar):
-                        encontrado = True
-                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                        coincidencias.append(campos_guardar)
-                        contador += 1
-    
-                        dato_formateado = list(dato)
-                        dato_formateado[1] = dato_formateado[1].capitalize()
-                        dato_formateado[2] = dato_formateado[2].capitalize()
-    
-                        try:
-                            mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
-                        except IndexError:
-                            mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
-    
-                        if contador == 1:
-                            primer_mensaje = mensaje_item
-                        else:
-                            primer_mensaje += f"\n{mensaje_item}"
-                    elif (not altura_buscar):
-                        encontrado = True
-                        campos_guardar = [dato[0], dato[1], dato[2], dato[3], dato[4], dato[5], dato[6], hoja["Coordinacion"] , hoja["Programa"]]
-                        coincidencias.append(campos_guardar)
-                        contador += 1
-
-                        dato_formateado = list(dato)
-                        dato_formateado[1] = dato_formateado[1].capitalize()
-                        dato_formateado[2] = dato_formateado[2].capitalize()
-
-                        try:
-                            mensaje_item = f"DNI: {dato_formateado[0]}\n{hoja['formatear'](dato_formateado)}\n{'-' * 40}"
-                        except IndexError:
-                            mensaje_item = f"(Fila encontrada en {nombre_interno} pero con columnas insuficientes)"
-
-                        if contador == 1:
-                            primer_mensaje = mensaje_item
-                        else:
-                            primer_mensaje += f"\n{mensaje_item}"
-
-            if contador > 0:
-                self._escribir_resultado(primer_mensaje)
-        
-        self.guardar_resultados(coincidencias)
-
-        if not encontrado:
-            self._escribir_resultado(f"El Domicilio ingresado '{calle_buscar.capitalize()}{' ' + altura_buscar.capitalize() if altura_buscar else ''}' no se encontro en las bases de datos.")    
 
     # ------------------------------------------------------------------
     # Funciones de los resultados
