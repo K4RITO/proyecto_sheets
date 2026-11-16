@@ -10,7 +10,6 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import tkinter.font as tkfont
-from PIL import Image, ImageTk
 import re
 import csv
 import os
@@ -20,6 +19,7 @@ import glob
 import shutil
 from pathlib import Path
 
+from PIL import Image, ImageTk
 import gspread
 
 # Configuracion de conexion
@@ -768,9 +768,11 @@ class BuscadorApp:
         """
         try:
             self._cargar_datos()
+            self.guardar_backup(self.registros)
             self.root.after(0, lambda: self.estado_var.set("Bases de datos actualizadas."))
         except Exception as e:
-            self.root.after(0, lambda: self._mostrar_error_conexion(e))
+            self._cargar_backup()
+            self.root.after(0, lambda err=e: self._mostrar_error_conexion(err))
         finally:
             self.root.after(0, lambda: self._set_controles_habilitados(True))
 
